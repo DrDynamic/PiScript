@@ -1,0 +1,57 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "options": {
+        "cwd": "${workspaceFolder}/build"
+    },
+    "problemMatcher": "$gcc",
+    "presentation": {
+        "showReuseMessage": false,
+        "clear": true
+    },
+    "tasks": [
+        {
+            "label": "clean",
+            "detail": "Clean generated files from last build.",
+            "type": "shell",
+            "command": "make clean",
+            "presentation": {
+                "close": true
+            }
+        },
+        {
+            "label": "clean-hard",
+            "detail": "Delete complete build folder.",
+            "type": "shell",
+            "command": "rm -rf build && mkdir build",
+            "presentation": {
+                "close": true
+            }
+        },
+        {
+            "label": "generate",
+            "detail": "Generate buildsystem with cmake.",
+            "type": "shell",
+            "command": "cmake .."
+        },
+        {
+            "label": "build",
+            "detail": "Build the project with gcc.",
+            "type": "shell",
+            "command": "make all"
+        },
+        {
+            "label": "tests",
+            "detail": "Run all tests.",
+            "type": "shell",
+            "command": "make tests"
+        },
+        {
+            "label": "doc",
+            "detail": "Generate HTML documentation for source code.",
+            "type": "shell",
+            "command": "make doc"
+        }
+    ]
+}

@@ -1,0 +1,42 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: nikolodion/cmake-tdd:latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Configure
+      # Configure CMake in a 'build' subdirectory.
+      run: mkdir build && cd build && cmake .. 
+
+    - name: Build
+      # Build your program with the given configuration
+      working-directory: ${{github.workspace}}/build
+      run: make
+
+    - name: Tests
+      # Execute tests defined by the CMake configuration.
+      working-directory: ${{github.workspace}}/build
+      run: make tests
+
+    - name: Doc
+      # Generate documentation with doxygen.
+      working-directory: ${{github.workspace}}/build
+      run: make doc
+
+    - name: Rsync
+      if: ${{ github.ref == 'refs/heads/main' }} && ${{ github.event_name == 'push' }}
+      run: apt-get update && apt-get install -y rsync
+
+    - name: Pages
+      # Publish doxygen documentation (only on main)
+      if: ${{ github.ref == 'refs/heads/main' }} && ${{ github.event_name == 'push' }}
+      uses: JamesIves/github-pages-deploy-action@4.1.4
+      with:
+        branch: pages
+        folder: ${{github.workspace}}/build/doc/html
