@@ -16,7 +16,7 @@
  */
 
 #include "test.h"
-#include "mylib/mylib.h"
+#include "memory.h"
 
 
 /*
@@ -29,7 +29,7 @@
  *
  * @param state unused
  */
-static void says_hello(void **state) {
+static void reallocate(void **state) {
     (void)state;
     char str[10];
     mylib_sayHello(str);
@@ -48,8 +48,8 @@ static void says_hello(void **state) {
  * @return int count of failed tests
  */
 int main(void) {
-    const struct CMUnitTest tests_mylib[] = {
-        cmocka_unit_test(says_hello),
+    const struct CMUnitTest tests_memory[] = {
+        cmocka_unit_test(reallocate),
     };
-    return cmocka_run_group_tests(tests_mylib, NULL, NULL);
+    return cmocka_run_group_tests(tests_memory, NULL, NULL);
 }

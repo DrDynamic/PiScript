@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.30)
 
-project(cmake-cmocka-tdd-template LANGUAGES C)
+project(PiScript LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_SKIP_INSTALL_RULES TRUE)
