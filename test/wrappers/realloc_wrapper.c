@@ -9,7 +9,7 @@ void *__real_realloc(void *mem_address, size_t newsize);
 
 void *__wrap_realloc(void *mem_address, size_t size);
 void *__wrap_realloc(void *mem_address, size_t size) {
+    check_expected(mem_address);
     check_expected(size);
-    printf("__wrap_realloc\n");
     return __real_realloc(mem_address, size);
 }

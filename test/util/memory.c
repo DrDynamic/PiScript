@@ -15,24 +15,10 @@
  *
  */
 #include <stdlib.h>
-#include <stdio.h>
 
 #include "../test.h"
 #include "util/memory.h"
 
-/**
- * redifinitions / wrapping
- *
- */
-// void *__real_realloc(void *ptr, size_t size);
-/**
-void *__wrap_test_realloc(void *ptr, size_t size) {
-    (void)ptr;
-    check_expected(size);
-    assert_false(true);
-    return 0; //__real_realloc(ptr, size);
-}
-**/
 /*
  * Tests
  *
@@ -48,6 +34,7 @@ static void reallocate_allocates_memory(void **state) {
 
     void *data = NULL;
 
+    expect_value(__wrap_realloc, mem_address, data);
     expect_value(__wrap_realloc, size, 8);
     data = reallocate(data, 0, 8);
     free(data);
@@ -64,6 +51,7 @@ static void reallocate_reallocates_memory(void **state) {
 
     void *data = NULL;
 
+    expect_value(__wrap_realloc, mem_address, data);
     expect_value(__wrap_realloc, size, 16);
     data = reallocate(data, 8, 16);
     free(data);
@@ -117,9 +105,11 @@ static void GROW_ARRAY_reallocates_memory(void **state) {
 
     uint8_t *data = NULL;
 
+    expect_value(__wrap_realloc, mem_address, data);
     expect_value(__wrap_realloc, size, 8);
     data = GROW_ARRAY(uint8_t, data, 0, 8);
 
+    expect_value(__wrap_realloc, mem_address, data);
     expect_value(__wrap_realloc, size, 16);
     data = GROW_ARRAY(uint8_t, data, 8, 16);
 
