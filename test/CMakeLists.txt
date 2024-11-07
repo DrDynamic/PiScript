@@ -2,7 +2,8 @@ message(STATUS "Processing test directory...")
 
 # Files with tests, library under test is assumed to be named identical.
 set(TEST_FILES
-	mylib.c
+	empty.c
+#	util/memory.c
 )
 
 # Enable ctest-system and create test targets

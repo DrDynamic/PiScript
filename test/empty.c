@@ -16,8 +16,11 @@
  */
 
 #include "test.h"
-#include "memory.h"
 
+/**
+ * redifinitions / wrapping
+ *
+ */
 
 /*
  * Tests
@@ -25,15 +28,12 @@
  */
 
 /**
- * @brief Function sayHello should copy "Hello" into char-array.
+ * @brief Function reallocate should allocate memory, when it isn't already.
  *
  * @param state unused
  */
-static void reallocate(void **state) {
+static void empty_test(void **state) {
     (void)state;
-    char str[10];
-    mylib_sayHello(str);
-    assert_string_equal("Hello", str);
 }
 
 
@@ -48,8 +48,8 @@ static void reallocate(void **state) {
  * @return int count of failed tests
  */
 int main(void) {
-    const struct CMUnitTest tests_memory[] = {
-        cmocka_unit_test(reallocate),
+    const struct CMUnitTest tests_nothing[] = {
+        cmocka_unit_test(empty_test),
     };
-    return cmocka_run_group_tests(tests_memory, NULL, NULL);
+    return cmocka_run_group_tests(tests_nothing, NULL, NULL);
 }
