@@ -3,6 +3,11 @@
         "test.h": "c",
         "memory.h": "c",
         "stdlib.h": "c",
-        "cmocka.h": "c"
+        "cmocka.h": "c",
+        "common.h": "c",
+        "stdint.h": "c",
+        "stddef.h": "c",
+        "stdbool.h": "c",
+        "stdint-gcc.h": "c"
     }
 }
