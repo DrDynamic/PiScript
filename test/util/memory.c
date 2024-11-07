@@ -14,6 +14,8 @@
  * Includes
  *
  */
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "../test.h"
 #include "util/memory.h"
@@ -22,14 +24,15 @@
  * redifinitions / wrapping
  *
  */
-void *__real_realloc(void *ptr, size_t size);
-void *__wrap_realloc(void *ptr, size_t size) {
-    check_expected(ptr);
+// void *__real_realloc(void *ptr, size_t size);
+/**
+void *__wrap_test_realloc(void *ptr, size_t size) {
+    (void)ptr;
     check_expected(size);
-
-    return __real_realloc(ptr, size);
+    assert_false(true);
+    return 0; //__real_realloc(ptr, size);
 }
-
+**/
 /*
  * Tests
  *
@@ -44,10 +47,17 @@ static void reallocate_allocates_memory(void **state) {
     (void)state;
 
     void *data = NULL;
-    expect_value(__wrap_realloc, size, 9);
 
-    reallocate(data, 0, 8);
-    data = 0;
+    expect_value(__wrap_realloc, size, 8);
+    data = reallocate(data, 0, 8);
+    free(data);
+}
+
+static void reallocate_frees_memory(void **state) {
+    (void)state;
+
+    void *data = malloc(8);
+    data = reallocate(data, 8, 0);
 }
 
 
@@ -64,6 +74,6 @@ static void reallocate_allocates_memory(void **state) {
 int main(void) {
     const struct CMUnitTest tests_memory[] = {
         cmocka_unit_test(reallocate_allocates_memory),
-    };
+        cmocka_unit_test(reallocate_frees_memory)};
     return cmocka_run_group_tests(tests_memory, NULL, NULL);
 }

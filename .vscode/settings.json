@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "test.h": "c",
-        "memory.h": "c"
+        "memory.h": "c",
+        "stdlib.h": "c",
+        "cmocka.h": "c"
     }
 }

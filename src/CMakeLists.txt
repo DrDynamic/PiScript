@@ -2,6 +2,11 @@ message(STATUS "Processing src directory...")
 
 add_subdirectory(util)
 
-add_executable(${CMAKE_PROJECT_NAME} main.c)
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src/util)
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE util)
+file(GLOB sources
+  "${PROJECT_SOURCE_DIR}/src/**/*.h"
+  "${PROJECT_SOURCE_DIR}/src/**/*.c")
+
+add_executable(${CMAKE_PROJECT_NAME} main.c)
