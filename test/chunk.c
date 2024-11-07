@@ -64,6 +64,25 @@ static void chunk_is_writable(void **state) {
     free(chunk.code);
 }
 
+/**
+ * @brief The memory of a chunk can be freed. It will be initialized afterwards.
+ *
+ * @param state unused
+ */
+static void chunk_can_be_freed(void **state) {
+    (void)state;
+
+    Chunk chunk;
+    initChunk(&chunk);
+    writeChunk(&chunk, 0x42);
+    freeChunk(&chunk);
+
+    assert_int_equal(chunk.capacity, 0);
+    assert_int_equal(chunk.count, 0);
+    assert_ptr_equal(chunk.code, NULL);
+
+    free(chunk.code);
+}
 
 /*
  * Main test program
@@ -79,6 +98,7 @@ int main(void) {
     const struct CMUnitTest tests_nothing[] = {
         cmocka_unit_test(chunk_initializes),
         cmocka_unit_test(chunk_is_writable),
+        cmocka_unit_test(chunk_can_be_freed),
     };
     return cmocka_run_group_tests(tests_nothing, NULL, NULL);
 }

@@ -117,6 +117,19 @@ static void GROW_ARRAY_reallocates_memory(void **state) {
     data = GROW_ARRAY(uint8_t, data, 16, 0);
 }
 
+/**
+ * @brief Macro FREE_ARRAY frees  memory.
+ *
+ * @param state unused
+ */
+static void FREE_ARRAY_frees_memory(void **state) {
+    (void)state;
+
+    uint8_t *data = malloc(8);
+    (void)data;
+    FREE_ARRAY(uint8_t, data, 8);
+}
+
 /*
  * Main test program
  *
@@ -135,6 +148,7 @@ int main(void) {
         cmocka_unit_test(GROW_CAPACITY_has_minimum_capacity),
         cmocka_unit_test(GROW_CAPACITY_doubles_capacity),
         cmocka_unit_test(GROW_ARRAY_reallocates_memory),
+        cmocka_unit_test(FREE_ARRAY_frees_memory),
     };
     return cmocka_run_group_tests(tests_memory, NULL, NULL);
 }
