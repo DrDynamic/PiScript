@@ -17,18 +17,13 @@
 
 #include "test.h"
 
-/**
- * redifinitions / wrapping
- *
- */
-
 /*
  * Tests
  *
  */
 
 /**
- * @brief Function reallocate should allocate memory, when it isn't already.
+ * @brief cmocka can run tests
  *
  * @param state unused
  */
