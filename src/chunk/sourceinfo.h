@@ -8,7 +8,7 @@ typedef struct {
     BytecodeIndex count;
 
     Linenumber* linenumbers; // lines per file
-    uint8_t* linenumberCounter; // chunk bytes per line
+    uint32_t* linenumberCounter; // chunk bytes per line
 } SourceInfo;
 
 void initSourceInfo(SourceInfo* info);

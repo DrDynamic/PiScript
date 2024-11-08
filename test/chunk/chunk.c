@@ -19,6 +19,7 @@
 #include "../test.h"
 #include "chunk/chunk.h"
 
+#include <stdio.h>
 /**
  * helpers
  *
@@ -117,6 +118,52 @@ static void chunk_adds_constants(void** state)
 }
 
 /**
+ * @brief Adds Value to chunks constants and writes opcode to load the constant to chunks code.
+ * (OP_CONSTANT when index of constant fits into a single byte OP_CONSTANT_LONG otherwise)
+ *
+ * @param state
+ */
+static void chunk_writes_constants(void** state)
+{
+    (void)state;
+
+    Chunk chunk;
+    initChunk(&chunk);
+
+    for (int i = 0; i < 0x1FF; i++) {
+        writeConstant(&chunk, i, 1);
+        assert_int_equal(chunk.constants.values[i], i);
+    }
+
+    int value = 0;
+    for (int i = 0; i < 0x1FF;) {
+        if (value <= 0xFF) {
+            assert_int_equal(chunk.code[i], OP_CONSTANT);
+            assert_int_equal(chunk.code[i + 1], value);
+            i += 2;
+        } else {
+            printf("==============================\n");
+            printf("0x%06X == 0x%02X 0x%02X 0x%02X\n", value, (value >> 16) & 0xFF,
+                (value >> 8) & 0xFF, value & 0xFF);
+            assert_int_equal(chunk.code[i], OP_CONSTANT);
+            assert_int_equal(chunk.code[i + 1], ((value >> 16) & 0xFF));
+            assert_int_equal(chunk.code[i + 2], ((value >> 8) & 0xFF));
+            assert_int_equal(chunk.code[i + 3], (value & 0xFF));
+            i += 4;
+        }
+        value += 1;
+    }
+
+    assertChunk(&chunk, 0x800, 0x5FC, chunk.code);
+    assertConstants(&chunk, 0x200, 0x1FF, chunk.constants.values);
+    assertSourceInfo(&chunk, 8, 1);
+    assert_int_equal(chunk.sourceinfo.linenumbers[0], 1);
+    assert_int_equal(chunk.sourceinfo.linenumberCounter[0], 0x5FC);
+
+    freeChunk(&chunk);
+}
+
+/**
  * @brief The memory of a chunk can be freed. It will be initialized afterwards.
  *
  * @param state unused
@@ -154,6 +201,7 @@ int main(void)
         cmocka_unit_test(chunk_is_writable),
         cmocka_unit_test(chunk_adds_constants),
         cmocka_unit_test(chunk_can_be_freed),
+        cmocka_unit_test(chunk_writes_constants),
     };
     return cmocka_run_group_tests(tests_nothing, NULL, NULL);
 }

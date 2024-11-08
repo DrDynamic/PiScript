@@ -18,7 +18,7 @@ static void writeLine(SourceInfo* info, Linenumber line)
         info->capacity = GROW_CAPACITY(oldCapacity);
         info->linenumbers = GROW_ARRAY(Linenumber, info->linenumbers, oldCapacity, info->capacity);
         info->linenumberCounter
-            = GROW_ARRAY(uint8_t, info->linenumberCounter, oldCapacity, info->capacity);
+            = GROW_ARRAY(uint32_t, info->linenumberCounter, oldCapacity, info->capacity);
     }
 
     info->linenumbers[info->count] = line;
@@ -29,7 +29,7 @@ static void writeLine(SourceInfo* info, Linenumber line)
 void freeSourceInfo(SourceInfo* info)
 {
     FREE_ARRAY(Linenumber, info->linenumbers, info->capacity);
-    FREE_ARRAY(uint8_t, info->linenumberCounter, info->capacity);
+    FREE_ARRAY(uint32_t, info->linenumberCounter, info->capacity);
 
     initSourceInfo(info);
 }

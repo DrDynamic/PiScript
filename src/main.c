@@ -3,6 +3,8 @@
 #include "util/debug.h"
 #include "chunk/sourceinfo.h"
 
+#include <stdio.h>
+
 int main(int argc, const char* argv[])
 {
     (void)argc;
@@ -10,13 +12,10 @@ int main(int argc, const char* argv[])
 
     Chunk chunk;
     initChunk(&chunk);
-    int constant1 = addConstant(&chunk, 1.2);
-    int constant2 = addConstant(&chunk, 3.4);
 
-    writeChunk(&chunk, OP_CONSTANT, 1);
-    writeChunk(&chunk, constant1, 1);
-    writeChunk(&chunk, OP_CONSTANT, 1);
-    writeChunk(&chunk, constant2, 1);
+    for (int i = 0; i < 0x1FF; i++) {
+        writeConstant(&chunk, i, 1);
+    }
 
     writeChunk(&chunk, OP_RETURN, 2);
 
