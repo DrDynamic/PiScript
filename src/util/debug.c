@@ -3,15 +3,17 @@
 #include "debug.h"
 #include "value.h"
 
-void disassambleChunk(Chunk *chunk, const char *name) {
+void disassambleChunk(Chunk* chunk, const char* name)
+{
     printf("== %s ==\n", name);
 
-    for (int offset = 0; offset < chunk->count;) {
+    for (BytecodeIndex offset = 0; offset < chunk->count;) {
         offset = disassambleInstruction(chunk, offset);
     }
 }
 
-static int constantInstruction(const char *name, Chunk *chunk, int offset) {
+static int constantInstruction(const char* name, Chunk* chunk, int offset)
+{
     uint8_t constantIndex = chunk->code[offset + 1];
     printf("%-16s %4d '", name, constantIndex);
     printValue(chunk->constants.values[constantIndex]);
@@ -20,17 +22,21 @@ static int constantInstruction(const char *name, Chunk *chunk, int offset) {
     return offset + 2;
 }
 
-static int simpleInstruction(const char *name, int offset) {
+static int simpleInstruction(const char* name, int offset)
+{
     printf("%s\n", name);
     return offset + 1;
 }
 
-int disassambleInstruction(Chunk *chunk, int offset) {
+int disassambleInstruction(Chunk* chunk, int offset)
+{
     printf("[%04d] ", offset);
-    if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
+
+    // TODO: optimize - get linenumber could be quieried one time less
+    if (offset > 0 && getLinenumber(chunk, offset) == getLinenumber(chunk, offset - 1)) {
         printf("%-4s| ", "");
     } else {
-        printf("% 4d: ", chunk->lines[offset]);
+        printf("% 4d: ", getLinenumber(chunk, offset));
     }
 
     uint8_t instruction = chunk->code[offset];

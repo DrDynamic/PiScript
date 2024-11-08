@@ -1,8 +1,10 @@
 #include "common.h"
-#include "chunk.h"
+#include "chunk/chunk.h"
 #include "util/debug.h"
+#include "chunk/sourceinfo.h"
 
-int main(int argc, const char *argv[]) {
+int main(int argc, const char* argv[])
+{
     (void)argc;
     (void)argv;
 

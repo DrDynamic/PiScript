@@ -31,9 +31,11 @@ add_cmocka_test(memory
 				LINK_OPTIONS "${DEFAULT_LINK_FLAGS}" "-Wl,--wrap=realloc"
 				EXTRA_SOURCES "${PROJECT_SOURCE_DIR}/test/wrappers/realloc_wrapper.c")
 add_cmocka_test(Chunk
-				TEST_FILE chunk.c)
+				TEST_FILE chunk/chunk.c)
 add_cmocka_test(ValueArray
 				TEST_FILE value.c)
+add_cmocka_test(SourceInfo
+				TEST_FILE chunk/sourceinfo.c)
 
 
 
