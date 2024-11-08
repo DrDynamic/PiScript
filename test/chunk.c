@@ -80,8 +80,6 @@ static void chunk_can_be_freed(void **state) {
     assert_int_equal(chunk.capacity, 0);
     assert_int_equal(chunk.count, 0);
     assert_ptr_equal(chunk.code, NULL);
-
-    free(chunk.code);
 }
 
 /*
