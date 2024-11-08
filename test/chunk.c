@@ -24,10 +24,11 @@
  *
  */
 
-static void assertChunk(Chunk *chunk, int capacity, int count, uint8_t *code) {
+static void assertChunk(Chunk *chunk, int capacity, int count, uint8_t *code, int *lines) {
     assert_int_equal(chunk->capacity, capacity);
     assert_int_equal(chunk->count, count);
     assert_ptr_equal(chunk->code, code);
+    assert_ptr_equal(chunk->lines, lines);
 }
 
 static void assertConstants(Chunk *chunk, int capacity, int count, Value *values) {
@@ -52,7 +53,7 @@ static void chunk_initializes(void **state) {
     Chunk chunk;
     initChunk(&chunk);
 
-    assertChunk(&chunk, 0, 0, NULL);
+    assertChunk(&chunk, 0, 0, NULL, NULL);
     assertConstants(&chunk, 0, 0, NULL);
 }
 
@@ -66,10 +67,11 @@ static void chunk_is_writable(void **state) {
 
     Chunk chunk;
     initChunk(&chunk);
-    writeChunk(&chunk, 0x42);
+    writeChunk(&chunk, 0x42, 1);
 
-    assertChunk(&chunk, 8, 1, chunk.code);
+    assertChunk(&chunk, 8, 1, chunk.code, chunk.lines);
     assert_int_equal(chunk.code[0], 0x42);
+    assert_int_equal(chunk.lines[0], 1);
 
     assertConstants(&chunk, 0, 0, NULL);
 
@@ -77,7 +79,7 @@ static void chunk_is_writable(void **state) {
 }
 
 /**
- * @brief Values can be added to a chunks constants
+ * @brief Values can be added to a chunks constants and the Index to the added chunk is returned.
  *
  * @param state
  */
@@ -90,7 +92,7 @@ static void chunk_adds_constants(void **state) {
     int index = addConstant(&chunk, 13.37);
     assert_double_equal(chunk.constants.values[index], 13.37, 0);
 
-    assertChunk(&chunk, 0, 0, NULL);
+    assertChunk(&chunk, 0, 0, NULL, NULL);
     assertConstants(&chunk, 8, 1, chunk.constants.values);
 
     freeChunk(&chunk);
@@ -106,10 +108,10 @@ static void chunk_can_be_freed(void **state) {
 
     Chunk chunk;
     initChunk(&chunk);
-    writeChunk(&chunk, 0x42);
+    writeChunk(&chunk, 0x42, 1);
     freeChunk(&chunk);
 
-    assertChunk(&chunk, 0, 0, NULL);
+    assertChunk(&chunk, 0, 0, NULL, NULL);
     assertConstants(&chunk, 0, 0, NULL);
 }
 

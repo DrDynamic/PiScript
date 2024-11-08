@@ -9,6 +9,7 @@
         "stddef.h": "c",
         "stdbool.h": "c",
         "stdint-gcc.h": "c",
-        "chunk.h": "c"
+        "chunk.h": "c",
+        "value.h": "c"
     }
 }

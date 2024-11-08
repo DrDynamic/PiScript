@@ -8,11 +8,12 @@ int main(int argc, const char *argv[]) {
 
     Chunk chunk;
     initChunk(&chunk);
+    int constant = addConstant(&chunk, 1.2);
+
+    writeChunk(&chunk, OP_CONSTANT);
+    writeChunk(&chunk, constant);
+
     writeChunk(&chunk, OP_RETURN);
-    writeChunk(&chunk, OP_RETURN);
-    writeChunk(&chunk, OP_RETURN);
-    writeChunk(&chunk, OP_RETURN);
-    writeChunk(&chunk, 0x42);
 
     disassambleChunk(&chunk, "test chunk");
 
