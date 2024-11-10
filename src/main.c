@@ -22,7 +22,7 @@ int main(int argc, const char* argv[])
 
     writeChunk(&chunk, OP_RETURN, 2);
 
-    disassambleChunk(&chunk, "test chunk");
+    //    disassambleChunk(&chunk, "test chunk");
 
     interpret(&chunk);
 
