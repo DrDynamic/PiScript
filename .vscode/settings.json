@@ -8,7 +8,6 @@
         "stdint.h": "c",
         "stddef.h": "c",
         "stdbool.h": "c",
-        "stdint-gcc.h": "c",
         "chunk.h": "c",
         "value.h": "c",
         "sourceinfo.h": "c"
