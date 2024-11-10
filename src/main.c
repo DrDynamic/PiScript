@@ -1,14 +1,17 @@
 #include "common.h"
 #include "chunk/chunk.h"
 #include "util/debug.h"
-#include "chunk/sourceinfo.h"
+#include "vm.h"
 
+// playground includes
 #include <stdio.h>
 
 int main(int argc, const char* argv[])
 {
     (void)argc;
     (void)argv;
+
+    initVM();
 
     Chunk chunk;
     initChunk(&chunk);
@@ -21,6 +24,9 @@ int main(int argc, const char* argv[])
 
     disassambleChunk(&chunk, "test chunk");
 
+    interpret(&chunk);
+
+    freeVM();
     freeChunk(&chunk);
 
     return 0;
