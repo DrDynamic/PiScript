@@ -6,8 +6,14 @@
 
 VM vm;
 
+static void resetStack()
+{
+    vm.stackTop = vm.stack;
+}
+
 void initVM()
 {
+    resetStack();
 }
 
 void freeVM()
@@ -20,18 +26,29 @@ static InterpretResult run()
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
+        printf("          ");
+        for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+            printf("[");
+            printValue(*slot);
+            printf("]");
+        }
+        printf("\n");
         disassambleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
 
         uint8_t instruction;
         switch (instruction = READ_BYTE()) {
+        case OP_NEGATE:
+            push(-pop());
+            break;
         case OP_RETURN: {
+            printValue(pop());
+            printf("\n");
             return INTERPRET_OK;
         }
         case OP_CONSTANT: {
             Value constant = READ_CONSTANT();
-            printValue(constant);
-            printf("\n");
+            push(constant);
             break;
         }
         case OP_CONSTANT_LONG: {
@@ -40,8 +57,7 @@ static InterpretResult run()
             uint8_t addr3 = READ_BYTE();
             int constantAddr = (addr1 << 16) | (addr2 << 8) | addr3;
             Value constant = vm.chunk->constants.values[constantAddr];
-            printValue(constant);
-            printf("\n");
+            push(constant);
             break;
         }
         default:
@@ -60,4 +76,16 @@ InterpretResult interpret(Chunk* chunk)
     vm.ip = chunk->code;
 
     return run();
+}
+
+void push(Value value)
+{
+    *vm.stackTop = value;
+    vm.stackTop++;
+}
+
+Value pop()
+{
+    vm.stackTop--;
+    return *vm.stackTop;
 }

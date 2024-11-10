@@ -17,9 +17,10 @@ int main(int argc, const char* argv[])
     initChunk(&chunk);
 
     for (int i = 0; i < 0x1FF; i++) {
-        writeConstant(&chunk, i, 1);
+        //        writeConstant(&chunk, i, 1);
     }
-
+    writeConstant(&chunk, 13.37, 1);
+    writeChunk(&chunk, OP_NEGATE, 1);
     writeChunk(&chunk, OP_RETURN, 2);
 
     //    disassambleChunk(&chunk, "test chunk");
