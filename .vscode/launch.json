@@ -8,7 +8,7 @@
             "name": "(gdb) Launch PiScript",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/src/PiScript",
+            "program": "${workspaceFolder}/build/src/pit",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

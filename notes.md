@@ -13,7 +13,7 @@ https://github.com/Dinesh21Kumar/gtest-example/blob/master/CMakeLists.txt
 - integers
 - floats (or doubles)
 - booleens
-- strings / template strings
+- strings / template strings (string interpolation)
 - arrays (also associative)
 - objects
 - getter setter as Datatype?
@@ -124,6 +124,12 @@ https://github.com/Dinesh21Kumar/gtest-example/blob/master/CMakeLists.txt
   - unset
   - toString
   - compare
+
+## reflection
+- classes
+  - with all features (properties / traits / superclass / interfaces etc.)
+- functions
+- comments
 
 ## misc
 - php calls?

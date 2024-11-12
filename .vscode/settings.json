@@ -13,6 +13,7 @@
         "sourceinfo.h": "c",
         "chunkdefs.h": "c",
         "vm.h": "c",
-        "compiler.h": "c"
+        "compiler.h": "c",
+        "scanner.h": "c"
     }
 }
