@@ -10,4 +10,4 @@ file(GLOB sources
   "${PROJECT_SOURCE_DIR}/src/**/*.c"
   )
 
-add_executable(${CMAKE_PROJECT_NAME} ${sources} main.c)
+add_executable(pit ${sources} main.c)

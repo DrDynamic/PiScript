@@ -12,6 +12,7 @@
         "value.h": "c",
         "sourceinfo.h": "c",
         "chunkdefs.h": "c",
-        "vm.h": "c"
+        "vm.h": "c",
+        "compiler.h": "c"
     }
 }
