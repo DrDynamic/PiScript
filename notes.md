@@ -53,6 +53,7 @@ https://github.com/Dinesh21Kumar/gtest-example/blob/master/CMakeLists.txt
   - function
   - namespace
 ## namespaces
+## exceptions
 ## control flow
 - for
 - foreach (through interface)

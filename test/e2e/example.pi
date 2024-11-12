@@ -7,3 +7,18 @@ class Note implements Serializable {
         public readonly string content
     ) {}
 }
+
+class NoteApp {
+
+    public function run() {
+        var input = "";
+        while(input != "q") {
+            
+        }
+    }
+
+}
+
+
+app := new NoteApp();
+app.run();
