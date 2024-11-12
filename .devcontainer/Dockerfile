@@ -11,3 +11,5 @@ RUN apt-get -q -y update && apt-get -q -y install \
     graphviz \
     cppcheck \
     libcmocka-dev
+
+    USER ubuntu
