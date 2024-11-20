@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "compiler.h"
@@ -8,12 +9,37 @@ typedef struct {
     Token current;
     Token previous;
     bool hadError;
+    bool panicMode;
 } Parser;
 
+typedef enum {
+    PREC_NONE,
+    PREC_ASSIGNMENT, // =
+    PREC_OR, // or
+    PREC_AND, // and
+    PREC_EQUALITY, // == !=
+    PREC_COMPARISON, // < > <= >=
+    PREC_TERM, // + -
+    PREC_FACTOR, // * /
+    PREC_UNARY, // ! -
+    PREC_CALL, // . ()
+    PREC_PRIMARY
+} Precedence;
+
 Parser parser;
+Chunk* compilingChunk;
+
+static Chunk* currentChunk()
+{
+    return compilingChunk;
+}
 
 static void errorAt(Token* token, const char* message)
 {
+    if (parser.panicMode) {
+        return;
+    }
+    parser.panicMode = true;
     fprintf(stderr, "[line %d] Error", token->line);
 
     if (token->type == TOKEN_EOF) {
@@ -51,11 +77,114 @@ static void advance()
     }
 }
 
+static void consume(TokenType type, const char* message)
+{
+    if (parser.current.type == type) {
+        advance();
+        return;
+    }
+
+    errorAtCurrent(message);
+}
+
+static void emitByte(uint8_t byte)
+{
+    writeChunk(currentChunk(), byte, parser.previous.line);
+}
+
+static void emitBytes(uint8_t byte1, uint8_t byte2)
+{
+    emitByte(byte1);
+    emitByte(byte2);
+}
+
+static void emitReturn()
+{
+    emitByte(OP_RETURN);
+}
+
+static void emitConstant(Value value, int line)
+{
+    writeConstant(currentChunk(), value, line);
+}
+
+static void endCompiler()
+{
+    emitReturn();
+}
+
+static void binary()
+{
+    TokenType operatorType = parser.previous.type;
+    ParserRule* rule = getRule(operatorType);
+    parsePrecedence((Precedence)(rule.precedence + 1));
+
+    switch (operatorType) {
+    case TOKEN_PLUS:
+        emitByte(OP_ADD);
+        break;
+    case TOKEN_MINUS:
+        emitByte(OP_SUBTRACT);
+        break;
+    case TOKEN_STAR:
+        emitByte(OP_MULTIPLY);
+        break;
+    case TOKEN_SLASH:
+        emitByte(OP_DIVIDE);
+        break;
+    default:
+        return;
+    }
+}
+
+static void grouping()
+{
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+}
+
+static void number()
+{
+    double value = strtod(parser.previous.start, NULL);
+    emitConstant(value, parser.previous.line);
+}
+
+static void unary()
+{
+    TokenType operatorType = parser.previous.type;
+
+    parsePrecedence(PREC_UNARY);
+
+    switch (operatorType) {
+    case TOKEN_MINUS:
+        emitByte(OP_NEGATE);
+        break;
+
+    default:
+        break;
+    }
+}
+
+static void parsePrecedence(Precedence precedence)
+{
+}
+
+static void expression()
+{
+    parsePrecedence(PREC_ASSIGNMENT);
+}
+
 bool compile(const char* source, Chunk* chunk)
 {
     initScanner(source);
+    compilingChunk = chunk;
+
+    parser.hadError = false;
+    parser.panicMode = false;
+
     advance();
     expression();
     consume(TOKEN_EOF, "Expect end of expression.");
+    endCompiler();
     return !parser.hadError;
 }
