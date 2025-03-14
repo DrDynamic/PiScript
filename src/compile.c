@@ -167,7 +167,7 @@ static void grouping()
 static void number()
 {
     double value = strtod(parser.previous.start, NULL);
-    emitConstant(value, parser.previous.line);
+    emitConstant(NUMBER_VAL(value), parser.previous.line);
 }
 
 static void unary()
