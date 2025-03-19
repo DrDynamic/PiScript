@@ -105,8 +105,8 @@ static void chunk_adds_constants(void** state)
     Chunk chunk;
     initChunk(&chunk);
 
-    int index = addConstant(&chunk, 13.37);
-    assert_double_equal(chunk.constants.values[index], 13.37, 0);
+    int index = addConstant(&chunk, NUMBER_VAL(13.37));
+    assert_double_equal(AS_NUMBER(chunk.constants.values[index]), 13.37, 0);
 
     assertChunk(&chunk, 0, 0, NULL);
     assertConstants(&chunk, 8, 1, chunk.constants.values);
@@ -131,8 +131,8 @@ static void chunk_writes_constants(void** state)
     initChunk(&chunk);
 
     for (int i = 0; i < 0x1FF; i++) {
-        writeConstant(&chunk, i, 1);
-        assert_int_equal(chunk.constants.values[i], i);
+        writeConstant(&chunk, NUMBER_VAL(i), 1);
+        assert_int_equal(AS_NUMBER(chunk.constants.values[i]), i);
     }
 
     int value = 0;

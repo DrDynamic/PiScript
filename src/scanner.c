@@ -18,12 +18,12 @@ void initScanner(const char* source)
     scanner.current = source;
     scanner.line = 1;
 
-
+#ifdef DEBUG_PRINT_TOKENS
     int line = -1;
     for (;;) {
         Token token = scanToken();
         if (token.line != line) {
-            printf("%4d", token.line);
+            printf("%4d ", token.line);
             line = token.line;
         } else {
             printf("   | ");
@@ -33,6 +33,11 @@ void initScanner(const char* source)
         if (token.type == TOKEN_EOF)
             break;
     }
+
+    scanner.start = source;
+    scanner.current = source;
+    scanner.line = 1;
+#endif
 }
 
 static bool isAlpha(char c)

@@ -71,7 +71,7 @@ int main(int argc, const char* argv[])
     } else if (argc == 2) {
         runFile(argv[1]);
     } else {
-        fprintf(stderr, "Usage: pit [pasth]\n");
+        fprintf(stderr, "Usage: pit [path]\n");
         exit(64);
     }
 
