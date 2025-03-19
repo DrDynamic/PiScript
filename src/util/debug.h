@@ -2,5 +2,5 @@
 
 #include "../chunk/chunk.h"
 
-void disassambleChunk(Chunk *chunk, const char *name);
-int disassambleInstruction(Chunk *chunk, int offset);
+void disassembleChunk(Chunk* chunk, const char* name);
+int disassembleInstruction(Chunk* chunk, int offset);

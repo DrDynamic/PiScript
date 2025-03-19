@@ -14,6 +14,8 @@
         "chunkdefs.h": "c",
         "vm.h": "c",
         "compiler.h": "c",
-        "scanner.h": "c"
+        "scanner.h": "c",
+        "debug.h": "c",
+        "object.h": "c",
     }
 }

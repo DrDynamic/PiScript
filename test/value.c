@@ -34,7 +34,8 @@
  *
  * @param state unused
  */
-static void ValueArray_initializes(void **state) {
+static void ValueArray_initializes(void** state)
+{
     (void)state;
 
     ValueArray valueArray;
@@ -50,16 +51,17 @@ static void ValueArray_initializes(void **state) {
  *
  * @param state unused
  */
-static void ValueArray_is_writable(void **state) {
+static void ValueArray_is_writable(void** state)
+{
     (void)state;
 
     ValueArray valueArray;
     initValueArray(&valueArray);
-    writeValueArray(&valueArray, 0x42);
+    writeValueArray(&valueArray, NUMBER_VAL(0x42));
 
     assert_int_equal(valueArray.capacity, 8);
     assert_int_equal(valueArray.count, 1);
-    assert_int_equal(valueArray.values[0], 0x42);
+    assert_int_equal(AS_NUMBER(valueArray.values[0]), 0x42);
 
     free(valueArray.values);
 }
@@ -69,12 +71,13 @@ static void ValueArray_is_writable(void **state) {
  *
  * @param state unused
  */
-static void ValueArray_can_be_freed(void **state) {
+static void ValueArray_can_be_freed(void** state)
+{
     (void)state;
 
     ValueArray valueArray;
     initValueArray(&valueArray);
-    writeValueArray(&valueArray, 0x42);
+    writeValueArray(&valueArray, NUMBER_VAL(0x42));
     freeValueArray(&valueArray);
 
     assert_int_equal(valueArray.capacity, 0);
@@ -92,7 +95,8 @@ static void ValueArray_can_be_freed(void **state) {
  *
  * @return int count of failed tests
  */
-int main(void) {
+int main(void)
+{
     const struct CMUnitTest tests_nothing[] = {
         cmocka_unit_test(ValueArray_initializes),
         cmocka_unit_test(ValueArray_is_writable),
