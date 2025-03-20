@@ -320,6 +320,7 @@ static void expression()
 static void expressionStatement()
 {
     expression();
+    match(TOKEN_SEMICOLON);
     //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
     emitByte(OP_POP);
 }
@@ -327,13 +328,41 @@ static void expressionStatement()
 static void printStatement()
 {
     expression();
+    match(TOKEN_SEMICOLON);
     //    consume(TOKEN_SEMICOLON, "Expected ; after value.");
     emitByte(OP_PRINT);
+}
+
+static void synchronize()
+{
+    parser.panicMode = false;
+
+    while (parser.current.type != TOKEN_EOF) {
+        if (parser.previous.type == TOKEN_SEMICOLON) {
+            return;
+        }
+        switch (parser.current.type) {
+        case TOKEN_CLASS:
+        case TOKEN_FUN:
+        case TOKEN_VAR:
+        case TOKEN_FOR:
+        case TOKEN_IF:
+        case TOKEN_WHILE:
+        case TOKEN_PRINT:
+        case TOKEN_RETURN:
+            return;
+        default:;
+        }
+        advance();
+    }
 }
 
 static void declaration()
 {
     statement();
+
+    if (parser.panicMode)
+        synchronize();
 }
 
 static void statement()
