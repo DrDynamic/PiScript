@@ -456,7 +456,7 @@ static void declareVariable()
         }
 
         if (identifiersEqual(name, &local->name)) {
-            error("Already a variable with this name in this scope");
+            error("Already a variable with this name in this scope.");
         }
     }
 
