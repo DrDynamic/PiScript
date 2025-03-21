@@ -26,7 +26,7 @@ void writeChunk(Chunk* chunk, uint8_t byte, int line)
     chunk->count++;
 }
 
-void writeConstant(Chunk* chunk, Value value, int line)
+void writeConstant(Chunk* chunk, Value value, int line, OpCode opCodeShort, OpCode opCodeLong)
 {
     uint32_t index = addConstant(chunk, value);
     if (index > 0xFF) {
@@ -34,12 +34,12 @@ void writeConstant(Chunk* chunk, Value value, int line)
         uint8_t idx2 = (index >> 8) & 0xFF;
         uint8_t idx3 = (index >> 16) & 0xFF;
 
-        writeChunk(chunk, OP_CONSTANT_LONG, line);
+        writeChunk(chunk, opCodeLong, line);
         writeChunk(chunk, idx3, line);
         writeChunk(chunk, idx2, line);
         writeChunk(chunk, idx1, line);
     } else {
-        writeChunk(chunk, OP_CONSTANT, line);
+        writeChunk(chunk, opCodeShort, line);
         writeChunk(chunk, index, line);
     }
 }

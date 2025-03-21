@@ -131,7 +131,7 @@ static void chunk_writes_constants(void** state)
     initChunk(&chunk);
 
     for (int i = 0; i < 0x1FF; i++) {
-        writeConstant(&chunk, NUMBER_VAL(i), 1);
+        writeConstant(&chunk, NUMBER_VAL(i), 1, OP_CONSTANT, OP_CONSTANT_LONG);
         assert_int_equal(AS_NUMBER(chunk.constants.values[i]), i);
     }
 
