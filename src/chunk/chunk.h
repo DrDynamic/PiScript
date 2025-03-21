@@ -12,6 +12,8 @@ typedef enum {
     OP_TRUE,
     OP_FALSE,
     OP_POP,
+    OP_GET_GLOBAL,
+    OP_GET_GLOBAL_LONG,
     OP_DEFINE_GLOBAL,
     OP_DEFINE_GLOBAL_LONG,
     OP_EQUAL,

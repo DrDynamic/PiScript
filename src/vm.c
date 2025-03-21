@@ -93,8 +93,8 @@ static InterpretResult run()
 {
 #define READ_BYTE() (*vm.ip++)
 #define READ_UINT_24() (makeUint24(READ_BYTE(), READ_BYTE(), READ_BYTE()))
-#define READ_CONSTANT(addr) (vm.chunk->constants.values[addr])
-#define READ_STRING(addr) AS_STRING(READ_CONSTANT(addr))
+#define GET_CONSTANT(addr) (vm.chunk->constants.values[addr])
+#define GET_STRING(addr) AS_STRING(GET_CONSTANT(addr))
 #define BINARY_OP(valueType, op)                                                                   \
     do {                                                                                           \
         if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) {                                          \
@@ -164,13 +164,13 @@ static InterpretResult run()
         }
         case OP_CONSTANT: {
             uint8_t addr = READ_BYTE();
-            Value constant = READ_CONSTANT(addr);
+            Value constant = GET_CONSTANT(addr);
             push(constant);
             break;
         }
         case OP_CONSTANT_LONG: {
             uint32_t addr = READ_UINT_24();
-            Value constant = READ_CONSTANT(addr);
+            Value constant = GET_CONSTANT(addr);
             push(constant);
             break;
         }
@@ -186,16 +186,38 @@ static InterpretResult run()
         case OP_POP:
             pop();
             break;
+        case OP_GET_GLOBAL: {
+            uint8_t addr = READ_BYTE();
+            ObjString* name = GET_STRING(addr);
+            Value value;
+            if (!tableGet(&vm.globals, name, &value)) {
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            push(value);
+            break;
+        }
+        case OP_GET_GLOBAL_LONG: {
+            uint8_t addr = READ_UINT_24();
+            ObjString* name = GET_STRING(addr);
+            Value value;
+            if (!tableGet(&vm.globals, name, &value)) {
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            push(value);
+            break;
+        }
         case OP_DEFINE_GLOBAL: {
             uint8_t addr = READ_BYTE();
-            ObjString* name = READ_STRING(addr);
+            ObjString* name = GET_STRING(addr);
             tableSet(&vm.globals, name, peek(0));
             pop();
             break;
         }
         case OP_DEFINE_GLOBAL_LONG: {
             uint32_t addr = READ_UINT_24();
-            ObjString* name = READ_STRING(addr);
+            ObjString* name = GET_STRING(addr);
             tableSet(&vm.globals, name, peek(0));
             pop();
             break;
@@ -232,8 +254,8 @@ static InterpretResult run()
 
 #undef READ_BYTE
 #undef READ_UINT_24
-#undef READ_CONSTANT
-#undef READ_STRING
+#undef GET_CONSTANT
+#undef GET_STRING
 #undef BINARY_OP
 }
 
