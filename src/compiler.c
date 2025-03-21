@@ -334,7 +334,7 @@ static void parsePrecedence(Precedence precedence)
     advance();
     ParseFn prefixRule = getRule(parser.previous.type)->prefix;
     if (prefixRule == NULL) {
-        error("Expected expression.");
+        error("Expect expression.");
         return;
     }
 
