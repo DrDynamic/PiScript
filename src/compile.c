@@ -131,13 +131,25 @@ static void emitReturn()
 
 static uint32_t makeConstant(Value value)
 {
-    uint32_t constant = addConstant(currentChunk(), value);
-    return constant;
+    uint32_t addrerss = addConstant(currentChunk(), value);
+    return addrerss;
 }
 
-static void emitConstant(Value value, int line)
+static void emitConstant(uint32_t addrerss, int line, OpCode opCodeShort, OpCode opCodeLong)
 {
-    writeConstant(currentChunk(), value, line);
+    if (addrerss > 0xFF) {
+        uint8_t idx1 = addrerss & 0xFF;
+        uint8_t idx2 = (addrerss >> 8) & 0xFF;
+        uint8_t idx3 = (addrerss >> 16) & 0xFF;
+
+        writeChunk(currentChunk(), opCodeLong, line);
+        writeChunk(currentChunk(), idx3, line);
+        writeChunk(currentChunk(), idx2, line);
+        writeChunk(currentChunk(), idx1, line);
+    } else {
+        writeChunk(currentChunk(), opCodeShort, line);
+        writeChunk(currentChunk(), addrerss, line);
+    }
 }
 
 static void endCompiler()
@@ -224,13 +236,16 @@ static void grouping()
 static void number()
 {
     double value = strtod(parser.previous.start, NULL);
-    emitConstant(NUMBER_VAL(value), parser.previous.line);
+
+    uint32_t addr = makeConstant(NUMBER_VAL(value));
+    emitConstant(addr, parser.previous.line, OP_CONSTANT, OP_CONSTANT_LONG);
 }
 
 static void string()
 {
-    emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)),
-        parser.previous.line);
+    uint32_t addr
+        = makeConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
+    emitConstant(addr, parser.previous.line, OP_CONSTANT, OP_CONSTANT_LONG);
 }
 
 static void unary()
@@ -326,10 +341,7 @@ static uint8_t parseVariable(const char* errorMessage)
 
 static void defineVariable(uint32_t global)
 {
-
-    // TODO: support OP_CONSTANT_LONG
-
-    emitBytes(OP_DEFINE_GLOBAL, global);
+    emitConstant(global, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
 }
 
 static ParseRule* getRule(TokenType type)

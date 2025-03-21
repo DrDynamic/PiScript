@@ -84,11 +84,17 @@ void freeVM()
     freeObjects();
 }
 
+static inline uint32_t makeUint24(uint8_t addr1, uint8_t addr2, uint8_t addr3)
+{
+    return (addr1 << 16) | (addr2 << 8) | addr3;
+}
+
 static InterpretResult run()
 {
 #define READ_BYTE() (*vm.ip++)
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-#define READ_STRING() AS_STRING(READ_CONSTANT())
+#define READ_UINT_24() (makeUint24(READ_BYTE(), READ_BYTE(), READ_BYTE()))
+#define READ_CONSTANT(addr) (vm.chunk->constants.values[addr])
+#define READ_STRING(addr) AS_STRING(READ_CONSTANT(addr))
 #define BINARY_OP(valueType, op)                                                                   \
     do {                                                                                           \
         if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) {                                          \
@@ -157,16 +163,14 @@ static InterpretResult run()
             return INTERPRET_OK;
         }
         case OP_CONSTANT: {
-            Value constant = READ_CONSTANT();
+            uint8_t addr = READ_BYTE();
+            Value constant = READ_CONSTANT(addr);
             push(constant);
             break;
         }
         case OP_CONSTANT_LONG: {
-            uint8_t addr1 = READ_BYTE();
-            uint8_t addr2 = READ_BYTE();
-            uint8_t addr3 = READ_BYTE();
-            int constantAddr = (addr1 << 16) | (addr2 << 8) | addr3;
-            Value constant = vm.chunk->constants.values[constantAddr];
+            uint32_t addr = READ_UINT_24();
+            Value constant = READ_CONSTANT(addr);
             push(constant);
             break;
         }
@@ -182,11 +186,20 @@ static InterpretResult run()
         case OP_POP:
             pop();
             break;
-        case OP_DEFINE_GLOBAL:
-            ObjString* name = READ_STRING();
+        case OP_DEFINE_GLOBAL: {
+            uint8_t addr = READ_BYTE();
+            ObjString* name = READ_STRING(addr);
             tableSet(&vm.globals, name, peek(0));
             pop();
             break;
+        }
+        case OP_DEFINE_GLOBAL_LONG: {
+            uint32_t addr = READ_UINT_24();
+            ObjString* name = READ_STRING(addr);
+            tableSet(&vm.globals, name, peek(0));
+            pop();
+            break;
+        }
         case OP_EQUAL: {
             Value a = pop();
             Value b = pop();
@@ -218,6 +231,7 @@ static InterpretResult run()
     }
 
 #undef READ_BYTE
+#undef READ_UINT_24
 #undef READ_CONSTANT
 #undef READ_STRING
 #undef BINARY_OP

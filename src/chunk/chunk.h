@@ -13,6 +13,7 @@ typedef enum {
     OP_FALSE,
     OP_POP,
     OP_DEFINE_GLOBAL,
+    OP_DEFINE_GLOBAL_LONG,
     OP_EQUAL,
     OP_NOT_EQUAL,
     OP_GREATER,
@@ -39,7 +40,7 @@ typedef struct {
 
 void initChunk(Chunk* chunk);
 void writeChunk(Chunk* chunk, uint8_t byte, int line);
-void writeConstant(Chunk* chunk, Value value, int line);
+void writeConstant(Chunk* chunk, Value value, int line, OpCode opCodeShort, OpCode opCodeLong);
 uint32_t addConstant(Chunk* chunk, Value value);
 Linenumber getLinenumber(Chunk* chunk, BytecodeIndex offset);
 void freeChunk(Chunk* chunk);
