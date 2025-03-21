@@ -222,6 +222,26 @@ static InterpretResult run()
             pop();
             break;
         }
+        case OP_SET_GLOBAL: {
+            uint8_t addr = READ_BYTE();
+            ObjString* name = GET_STRING(addr);
+            if (tableSet(&vm.globals, name, peek(0))) {
+                tableDelete(&vm.globals, name);
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_GLOBAL_LONG: {
+            uint8_t addr = READ_UINT_24();
+            ObjString* name = GET_STRING(addr);
+            if (tableSet(&vm.globals, name, peek(0))) {
+                tableDelete(&vm.globals, name);
+                runtimeError("Undefined variable '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
         case OP_EQUAL: {
             Value a = pop();
             Value b = pop();
