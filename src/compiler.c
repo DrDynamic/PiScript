@@ -203,6 +203,7 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 static uint32_t identifierConstant(Token* name);
+static int resolveLocal(Compiler* compiler, Token* name);
 
 static void binary(bool canAssign)
 {
@@ -286,14 +287,29 @@ static void string(bool canAssign)
 
 static void namedVariable(Token name, bool canAssign)
 {
-    uint32_t addr = identifierConstant(&name);
+    OpCode getOp, getOpLong, setOp, setOpLong;
+
+    uint32_t addr = resolveLocal(current, &name);
+    if (addr != -1) {
+        getOp = OP_GET_LOCAL;
+        getOpLong = OP_GET_LOCAL_LONG;
+        setOp = OP_SET_LOCAL;
+        setOpLong = OP_SET_LOCAL_LONG;
+    } else {
+        addr = identifierConstant(&name);
+        getOp = OP_GET_GLOBAL;
+        getOpLong = OP_GET_GLOBAL_LONG;
+        setOp = OP_SET_GLOBAL;
+        setOpLong = OP_SET_GLOBAL_LONG;
+    }
+
     int line = parser.previous.line;
 
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
-        emitConstant(addr, line, OP_SET_GLOBAL, OP_SET_GLOBAL_LONG);
+        emitConstant(addr, line, setOp, setOpLong);
     } else {
-        emitConstant(addr, line, OP_GET_GLOBAL, OP_GET_GLOBAL_LONG);
+        emitConstant(addr, line, getOp, getOpLong);
     }
 }
 
@@ -398,6 +414,18 @@ static bool identifiersEqual(Token* a, Token* b)
         return false;
     }
     return memcmp(a->start, b->start, a->length) == 0;
+}
+
+static int resolveLocal(Compiler* compiler, Token* name)
+{
+    for (int i = compiler->localCount - 1; i >= 0; i--) {
+        Local* local = &compiler->locals[i];
+        if (identifiersEqual(name, &local->name)) {
+            return i;
+        }
+    }
+
+    return -1;
 }
 
 static void addLocal(Token name)
