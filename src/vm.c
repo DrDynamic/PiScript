@@ -186,6 +186,26 @@ static InterpretResult run()
         case OP_POP:
             pop();
             break;
+        case OP_GET_LOCAL: {
+            uint8_t slot = READ_BYTE();
+            push(vm.stack[slot]);
+            break;
+        }
+        case OP_GET_LOCAL_LONG: {
+            uint32_t slot = READ_UINT_24();
+            push(vm.stack[slot]);
+            break;
+        }
+        case OP_SET_LOCAL: {
+            uint32_t slot = READ_BYTE();
+            vm.stack[slot] = peek(0);
+            break;
+        }
+        case OP_SET_LOCAL_LONG: {
+            uint32_t slot = READ_UINT_24();
+            vm.stack[slot] = peek(0);
+            break;
+        }
         case OP_GET_GLOBAL: {
             uint8_t addr = READ_BYTE();
             ObjString* name = GET_STRING(addr);

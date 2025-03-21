@@ -42,6 +42,26 @@ static int simpleInstruction(const char* name, int offset)
     return offset + 1;
 }
 
+static int byteInstruction(const char* name, Chunk* chunk, int offset)
+{
+    uint8_t slot = chunk->code[offset + 1];
+    printf("%-16s %4d\n", name, slot);
+    return offset + 2;
+}
+
+static int uint24Instruction(const char* name, Chunk* chunk, int offset)
+{
+    uint8_t idx1 = chunk->code[offset + 1];
+    uint8_t idx2 = chunk->code[offset + 2];
+    uint8_t idx3 = chunk->code[offset + 3];
+
+    uint32_t constantIndex = (idx1 << 16) | (idx2 << 8) | idx3;
+
+    printf("%-16s %4d\n", name, constantIndex);
+
+    return offset + 4;
+}
+
 int disassembleInstruction(Chunk* chunk, int offset)
 {
     printf("[%04d] ", offset);
@@ -82,6 +102,14 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return simpleInstruction("OP_FALSE", offset);
     case OP_POP:
         return simpleInstruction("OP_POP", offset);
+    case OP_GET_LOCAL:
+        return byteInstruction("OP_GET_LOCAL", chunk, offset);
+    case OP_GET_LOCAL_LONG:
+        return uint24Instruction("OP_GET_LOCAL_LONG", chunk, offset);
+    case OP_SET_LOCAL:
+        return byteInstruction("OP_SET_LOCAL", chunk, offset);
+    case OP_SET_LOCAL_LONG:
+        return uint24Instruction("OP_SET_LOCAL_LONG", chunk, offset);
     case OP_GET_GLOBAL:
         return constantInstruction("OP_GET_GLOBAL", chunk, offset);
     case OP_GET_GLOBAL_LONG:
