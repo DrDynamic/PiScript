@@ -133,12 +133,13 @@ static void emitByte(uint8_t byte)
     writeChunk(currentChunk(), byte, parser.previous.line);
 }
 
+/*
 static void emitBytes(uint8_t byte1, uint8_t byte2)
 {
     emitByte(byte1);
     emitByte(byte2);
 }
-
+*/
 static void emitReturn()
 {
     emitByte(OP_RETURN);
@@ -219,6 +220,7 @@ static int resolveLocal(Compiler* compiler, Token* name);
 
 static void binary(bool canAssign)
 {
+    (void)canAssign;
     TokenType operatorType = parser.previous.type;
     ParseRule* rule = getRule(operatorType);
     parsePrecedence((Precedence)(rule->precedence + 1));
@@ -261,6 +263,7 @@ static void binary(bool canAssign)
 
 static void literal(bool canAssign)
 {
+    (void)canAssign;
     switch (parser.previous.type) {
     case TOKEN_NIL:
         emitByte(OP_NIL);
@@ -278,12 +281,14 @@ static void literal(bool canAssign)
 
 static void grouping(bool canAssign)
 {
+    (void)canAssign;
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
 static void number(bool canAssign)
 {
+    (void)canAssign;
     double value = strtod(parser.previous.start, NULL);
 
     uint32_t addr = makeConstant(NUMBER_VAL(value));
@@ -292,6 +297,7 @@ static void number(bool canAssign)
 
 static void string(bool canAssign)
 {
+    (void)canAssign;
     uint32_t addr
         = makeConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
     emitConstant(addr, parser.previous.line, OP_CONSTANT, OP_CONSTANT_LONG);
@@ -301,7 +307,7 @@ static void namedVariable(Token name, bool canAssign)
 {
     OpCode getOp, getOpLong, setOp, setOpLong;
 
-    uint32_t addr = resolveLocal(current, &name);
+    int addr = resolveLocal(current, &name);
     if (addr != -1) {
         getOp = OP_GET_LOCAL;
         getOpLong = OP_GET_LOCAL_LONG;
@@ -332,6 +338,7 @@ static void variable(bool canAssign)
 
 static void unary(bool canAssign)
 {
+    (void)canAssign;
     TokenType operatorType = parser.previous.type;
 
     parsePrecedence(PREC_UNARY);

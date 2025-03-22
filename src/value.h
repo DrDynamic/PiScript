@@ -36,8 +36,8 @@ typedef struct {
 #define OBJ_VAL(object) ((Value) { VAL_OBJ, { .obj = (Obj*)object } })
 
 typedef struct {
-    int capacity;
-    int count;
+    unsigned int capacity;
+    unsigned int count;
     Value* values;
 } ValueArray;
 

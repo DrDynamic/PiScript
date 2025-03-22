@@ -84,8 +84,11 @@ void freeVM()
     freeObjects();
 }
 
-static inline uint32_t makeUint24(uint8_t addr1, uint8_t addr2, uint8_t addr3)
+static inline uint32_t readUint24()
 {
+    uint8_t addr1 = *vm.ip++;
+    uint8_t addr2 = *vm.ip++;
+    uint8_t addr3 = *vm.ip++;
     return (addr1 << 16) | (addr2 << 8) | addr3;
 }
 
@@ -98,7 +101,7 @@ static inline bool checkGlobalDefined(uint32_t addr)
 static InterpretResult run()
 {
 #define READ_BYTE() (*vm.ip++)
-#define READ_UINT_24() (makeUint24(READ_BYTE(), READ_BYTE(), READ_BYTE()))
+#define READ_UINT_24() readUint24()
 #define GET_CONSTANT(addr) (vm.chunk->constants.values[addr])
 #define GET_STRING(addr) AS_STRING(GET_CONSTANT(addr))
 #define BINARY_OP(valueType, op)                                                                   \
