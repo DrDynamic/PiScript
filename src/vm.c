@@ -91,7 +91,8 @@ static inline uint32_t makeUint24(uint8_t addr1, uint8_t addr2, uint8_t addr3)
 
 static inline bool checkGlobalDefined(uint32_t addr)
 {
-    return addr >= vm.globals->count || vm.globals->values[addr].as.obj == NULL;
+    return addr >= vm.globals.count
+        || (IS_OBJ(vm.globals.values[addr]) && vm.globals.values[addr].as.obj == NULL);
 }
 
 static InterpretResult run()
@@ -217,7 +218,7 @@ static InterpretResult run()
                 runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
-            push(vm.globals->values[addr]);
+            push(vm.globals.values[addr]);
             break;
         }
         case OP_GET_GLOBAL_LONG: {
@@ -226,24 +227,24 @@ static InterpretResult run()
                 runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
-            push(vm.globals->values[addr]);
+            push(vm.globals.values[addr]);
             break;
         }
         case OP_DEFINE_GLOBAL: {
             uint8_t addr = READ_BYTE();
-            while (addr <= vm.globals->count) {
+            while (addr >= vm.globals.count) {
                 writeValueArray(&vm.globals, OBJ_VAL(NULL));
             }
-            vm.globals->values[addr] = peek(0);
+            vm.globals.values[addr] = peek(0);
             pop();
             break;
         }
         case OP_DEFINE_GLOBAL_LONG: {
             uint32_t addr = READ_UINT_24();
-            while (addr <= vm.globals->count) {
+            while (addr >= vm.globals.count) {
                 writeValueArray(&vm.globals, OBJ_VAL(NULL));
             }
-            vm.globals->values[addr] = peek(0);
+            vm.globals.values[addr] = peek(0);
             pop();
             break;
         }
@@ -253,7 +254,7 @@ static InterpretResult run()
                 runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
-            vm.globals->values[addr] = peek(0);
+            vm.globals.values[addr] = peek(0);
             break;
         }
         case OP_SET_GLOBAL_LONG: {
@@ -262,7 +263,7 @@ static InterpretResult run()
                 runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
-            vm.globals->values[addr] = peek(0);
+            vm.globals.values[addr] = peek(0);
             break;
         }
         case OP_EQUAL: {

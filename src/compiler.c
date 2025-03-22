@@ -191,7 +191,7 @@ static void endCompiler()
     }
 #endif
 
-    freeCompiler(&current);
+    freeCompiler(current);
 }
 
 static void beginScope()
