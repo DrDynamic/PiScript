@@ -1,10 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "util/memory.h"
 #include "object.h"
 #include "table.h"
 #include "value.h"
+#include "vm.h"
 
 #define TABLE_MAX_LOAD 0.75
 
@@ -28,8 +30,9 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key)
 
     for (;;) {
         Entry* entry = &entries[index];
+
         if (entry->key == NULL) {
-            if (IS_NIL(entry->value)) {
+            if (IS_NIL(entry->as.value)) {
                 // Empty entry
                 return tombstone != NULL ? tombstone : entry;
             } else {
@@ -51,19 +54,20 @@ static void adjustCapacity(Table* table, int capacity)
     Entry* entries = ALLOCATE(Entry, capacity);
     for (int i = 0; i < capacity; i++) {
         entries[i].key = NULL;
-        entries[i].value = NIL_VAL;
+        entries[i].as.value = NIL_VAL;
     }
 
     table->count = 0;
     for (int i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
-        if (entries->key == NULL) {
+
+        if (entry->key == NULL) {
             continue;
         }
 
         Entry* dest = findEntry(entries, capacity, entry->key);
         dest->key = entry->key;
-        dest->value = entry->value;
+        dest->as.value = entry->as.value;
         table->count++;
     }
 
@@ -84,7 +88,7 @@ bool tableGet(Table* table, ObjString* key, Value* value)
         return false;
     }
 
-    *value = entry->value;
+    *value = entry->as.value;
     return true;
 }
 
@@ -97,15 +101,60 @@ bool tableSet(Table* table, ObjString* key, Value value)
 
     Entry* entry = findEntry(table->entries, table->capacity, key);
     bool isNewKey = entry->key == NULL;
-    if (isNewKey && IS_NIL(entry->value)) {
+    if (isNewKey && IS_NIL(entry->as.value)) {
         table->count++;
     }
 
     entry->key = key;
-    entry->value = value;
+    entry->as.value = value;
 
     return isNewKey;
 }
+
+bool tableGetUint32(Table* table, ObjString* key, uint32_t* value)
+{
+
+
+    if (table->count == 0) {
+        return false;
+    }
+    /*
+        printf("== tableGetUiclea &table->entries[i];
+            if (entry->key == NULL) {
+                printf("  [%d] NULL = '%d'\n", i, entry->as.uint32);
+            } else {
+                printf("  [%d] %s = '%d'\n", i, entry->key->chars, entry->as.uint32);
+            }
+        }
+        printf("==================\n");
+    */
+    Entry* entry = findEntry(table->entries, table->capacity, key);
+    if (entry->key == NULL) {
+        return false;
+    }
+
+    *value = entry->as.uint32;
+    return true;
+}
+bool tableSetUint32(Table* table, ObjString* key, uint32_t value)
+{
+    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
+        int capacity = GROW_CAPACITY(table->capacity);
+        adjustCapacity(table, capacity);
+    }
+
+    Entry* entry = findEntry(table->entries, table->capacity, key);
+    bool isNewKey = entry->key == NULL;
+    if (isNewKey && IS_NIL(entry->as.value)) {
+        table->count++;
+    }
+
+    entry->key = key;
+    entry->as.uint32 = value;
+
+    return isNewKey;
+}
+
 
 bool tableDelete(Table* table, ObjString* key)
 {
@@ -120,7 +169,7 @@ bool tableDelete(Table* table, ObjString* key)
 
     // PLace a tombstone in the entry
     entry->key = NULL;
-    entry->value = BOOL_VAL(true);
+    entry->as.value = BOOL_VAL(true);
 
     return true;
 }
@@ -130,7 +179,7 @@ void tableAddAll(Table* from, Table* to)
     for (int i = 0; i < from->capacity; i++) {
         Entry* entry = &from->entries[i];
         if (entry->key != NULL) {
-            tableSet(to, entry->key, entry->value);
+            tableSet(to, entry->key, entry->as.value);
         }
     }
 }
@@ -145,7 +194,7 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
     for (;;) {
         Entry* entry = &table->entries[index];
         if (entry->key == NULL) {
-            if (IS_NIL(entry->value)) {
+            if (IS_NIL(entry->as.value)) {
                 // no matching entry even after probing
                 return NULL;
             }

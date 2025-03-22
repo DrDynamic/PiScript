@@ -5,6 +5,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+#include "util/LocalVarArray.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -45,8 +46,12 @@ typedef struct {
 } Local;
 
 typedef struct {
-    Local locals[UINT8_COUNT];
-    int localCount;
+    Table identifiers;
+    uint32_t identifiersCount;
+
+    Table localNames;
+    LocalVarArray localDepths;
+
     int scopeDepth;
 } Compiler;
 
@@ -131,12 +136,13 @@ static void emitByte(uint8_t byte)
     writeChunk(currentChunk(), byte, parser.previous.line);
 }
 
+/*
 static void emitBytes(uint8_t byte1, uint8_t byte2)
 {
     emitByte(byte1);
     emitByte(byte2);
 }
-
+*/
 static void emitReturn()
 {
     emitByte(OP_RETURN);
@@ -167,9 +173,24 @@ static void emitConstant(uint32_t addrerss, int line, OpCode opCodeShort, OpCode
 
 static void initCompiler(Compiler* compiler)
 {
-    compiler->localCount = 0;
+    initTable(&compiler->identifiers);
+    compiler->identifiersCount = 0;
+
+    initTable(&compiler->localNames);
+    initLocalVarArray(&compiler->localDepths);
+
     compiler->scopeDepth = 0;
     current = compiler;
+}
+
+static void freeCompiler(Compiler* compiler)
+{
+    freeTable(&compiler->identifiers);
+
+    freeTable(&compiler->localNames);
+    freeLocalVarArray(&compiler->localDepths);
+
+    initCompiler(compiler);
 }
 
 static void endCompiler()
@@ -180,6 +201,8 @@ static void endCompiler()
         disassembleChunk(currentChunk(), "code");
     }
 #endif
+
+    freeCompiler(current);
 }
 
 static void beginScope()
@@ -190,10 +213,19 @@ static void beginScope()
 static void endScope()
 {
     current->scopeDepth--;
-    while (current->localCount > 0
-        && current->locals[current->localCount - 1].depth > current->scopeDepth) {
+
+    while (current->localDepths.count > 0
+        && current->localDepths.values[current->localDepths.count - 1].depth
+            > current->scopeDepth) {
+
+        LocalVar* local = &current->localDepths.values[current->localDepths.count - 1];
+        if (local->shadowAddr != -1) {
+            tableSetUint32(&current->localNames, local->identifier, local->shadowAddr);
+        } else {
+            tableDelete(&current->localNames, local->identifier);
+        }
         emitByte(OP_POP);
-        current->localCount--;
+        current->localDepths.count--;
     }
 }
 
@@ -207,6 +239,7 @@ static int resolveLocal(Compiler* compiler, Token* name);
 
 static void binary(bool canAssign)
 {
+    (void)canAssign;
     TokenType operatorType = parser.previous.type;
     ParseRule* rule = getRule(operatorType);
     parsePrecedence((Precedence)(rule->precedence + 1));
@@ -249,6 +282,7 @@ static void binary(bool canAssign)
 
 static void literal(bool canAssign)
 {
+    (void)canAssign;
     switch (parser.previous.type) {
     case TOKEN_NIL:
         emitByte(OP_NIL);
@@ -266,12 +300,14 @@ static void literal(bool canAssign)
 
 static void grouping(bool canAssign)
 {
+    (void)canAssign;
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
 static void number(bool canAssign)
 {
+    (void)canAssign;
     double value = strtod(parser.previous.start, NULL);
 
     uint32_t addr = makeConstant(NUMBER_VAL(value));
@@ -280,6 +316,7 @@ static void number(bool canAssign)
 
 static void string(bool canAssign)
 {
+    (void)canAssign;
     uint32_t addr
         = makeConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
     emitConstant(addr, parser.previous.line, OP_CONSTANT, OP_CONSTANT_LONG);
@@ -289,7 +326,7 @@ static void namedVariable(Token name, bool canAssign)
 {
     OpCode getOp, getOpLong, setOp, setOpLong;
 
-    uint32_t addr = resolveLocal(current, &name);
+    int addr = resolveLocal(current, &name);
     if (addr != -1) {
         getOp = OP_GET_LOCAL;
         getOpLong = OP_GET_LOCAL_LONG;
@@ -320,6 +357,7 @@ static void variable(bool canAssign)
 
 static void unary(bool canAssign)
 {
+    (void)canAssign;
     TokenType operatorType = parser.previous.type;
 
     parsePrecedence(PREC_UNARY);
@@ -405,41 +443,47 @@ static void parsePrecedence(Precedence precedence)
 
 static uint32_t identifierConstant(Token* name)
 {
-    return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
-}
-
-static bool identifiersEqual(Token* a, Token* b)
-{
-    if (a->length != b->length) {
-        return false;
+    ObjString* identifier = copyString(name->start, name->length);
+    uint32_t addr;
+    if (tableGetUint32(&current->identifiers, identifier, &addr)) {
+        return addr;
     }
-    return memcmp(a->start, b->start, a->length) == 0;
+
+    addr = current->identifiersCount++;
+    tableSetUint32(&current->identifiers, identifier, addr);
+
+    return addr;
 }
 
 static int resolveLocal(Compiler* compiler, Token* name)
 {
-    for (int i = compiler->localCount - 1; i >= 0; i--) {
-        Local* local = &compiler->locals[i];
-        if (identifiersEqual(name, &local->name)) {
-            if (local->depth == -1) {
-                error("Can't read local variable in its own initializer.");
-            }
-            return i;
+    ObjString* identifier = copyString(name->start, name->length);
+    uint32_t addr;
+    if (tableGetUint32(&compiler->localNames, identifier, &addr)) {
+        if (compiler->localDepths.values[addr].depth == -1) {
+            error("Can't read local variable in its own initializer.");
         }
+        return addr;
     }
-
     return -1;
 }
 
 static void addLocal(Token name)
 {
-    if (current->localCount == UINT8_COUNT) {
-        error("Too many local variables in function.");
-        return;
+    ObjString* identifier = copyString(name.start, name.length);
+
+    uint32_t addr;
+    if (tableGetUint32(&current->localNames, identifier, &addr)) {
+
+        tableSetUint32(&current->localNames, identifier, current->localDepths.count);
+        writeLocalVarArray(&current->localDepths,
+            (LocalVar) { .identifier = identifier, .depth = -1, .shadowAddr = addr });
+
+    } else {
+        tableSetUint32(&current->localNames, identifier, current->localDepths.count);
+        writeLocalVarArray(&current->localDepths,
+            (LocalVar) { .identifier = identifier, .depth = -1, .shadowAddr = -1 });
     }
-    Local* local = &current->locals[current->localCount++];
-    local->name = name;
-    local->depth = -1;
 }
 
 static void declareVariable()
@@ -448,14 +492,10 @@ static void declareVariable()
         return;
 
     Token* name = &parser.previous;
-
-    for (int i = current->localCount - 1; i >= 0; i--) {
-        Local* local = &current->locals[i];
-        if (local->depth != -1 && local->depth < current->scopeDepth) {
-            break;
-        }
-
-        if (identifiersEqual(name, &local->name)) {
+    ObjString* identifier = copyString(name->start, name->length);
+    uint32_t addr;
+    if (tableGetUint32(&current->localNames, identifier, &addr)) {
+        if (current->localDepths.values[addr].depth == current->scopeDepth) {
             error("Already a variable with this name in this scope.");
         }
     }
@@ -477,7 +517,7 @@ static uint32_t parseVariable(const char* errorMessage)
 
 static void markInitialized()
 {
-    current->locals[current->localCount - 1].depth = current->scopeDepth;
+    current->localDepths.values[current->localDepths.count - 1].depth = current->scopeDepth;
 }
 
 static void defineVariable(uint32_t global)
