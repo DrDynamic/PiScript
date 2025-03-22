@@ -45,6 +45,8 @@ typedef struct {
 } Local;
 
 typedef struct {
+    Table identifiers;
+    uint32_t identifiersCount;
     Local locals[UINT8_COUNT];
     int localCount;
     int scopeDepth;
@@ -167,9 +169,17 @@ static void emitConstant(uint32_t addrerss, int line, OpCode opCodeShort, OpCode
 
 static void initCompiler(Compiler* compiler)
 {
+    initTable(&compiler->identifiers);
+    compiler->identifiersCount = 0;
     compiler->localCount = 0;
     compiler->scopeDepth = 0;
     current = compiler;
+}
+
+static void freeCompiler(Compiler* compiler)
+{
+    freeTable(&compiler->identifiers);
+    initCompiler(compiler);
 }
 
 static void endCompiler()
@@ -180,6 +190,8 @@ static void endCompiler()
         disassembleChunk(currentChunk(), "code");
     }
 #endif
+
+    freeCompiler(&current);
 }
 
 static void beginScope()
@@ -405,7 +417,16 @@ static void parsePrecedence(Precedence precedence)
 
 static uint32_t identifierConstant(Token* name)
 {
-    return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+    ObjString* identifier = copyString(name->start, name->length);
+    uint32_t addr;
+    if (tableGetUint32(&current->identifiers, identifier, &addr)) {
+        return addr;
+    }
+
+    addr = current->identifiersCount++;
+    tableSetUint32(&current->identifiers, identifier, addr);
+
+    return addr;
 }
 
 static bool identifiersEqual(Token* a, Token* b)
