@@ -1,10 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "util/memory.h"
 #include "object.h"
 #include "table.h"
 #include "value.h"
+#include "vm.h"
 
 #define TABLE_MAX_LOAD 0.75
 
@@ -28,6 +30,7 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key)
 
     for (;;) {
         Entry* entry = &entries[index];
+
         if (entry->key == NULL) {
             if (IS_NIL(entry->as.value)) {
                 // Empty entry
@@ -57,7 +60,8 @@ static void adjustCapacity(Table* table, int capacity)
     table->count = 0;
     for (int i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
-        if (entries->key == NULL) {
+
+        if (entry->key == NULL) {
             continue;
         }
 
@@ -109,10 +113,21 @@ bool tableSet(Table* table, ObjString* key, Value value)
 
 bool tableGetUint32(Table* table, ObjString* key, uint32_t* value)
 {
+
+
     if (table->count == 0) {
         return false;
     }
-
+    /*
+        printf("== tableGetUiclea &table->entries[i];
+            if (entry->key == NULL) {
+                printf("  [%d] NULL = '%d'\n", i, entry->as.uint32);
+            } else {
+                printf("  [%d] %s = '%d'\n", i, entry->key->chars, entry->as.uint32);
+            }
+        }
+        printf("==================\n");
+    */
     Entry* entry = findEntry(table->entries, table->capacity, key);
     if (entry->key == NULL) {
         return false;

@@ -9,6 +9,7 @@
 
 #define ALLOCATE_OBJ(type, objectType) (type*)allocateObject(sizeof(type), objectType)
 
+
 static Obj* allocateObject(size_t size, ObjType type)
 {
     Obj* object = (Obj*)reallocate(NULL, 0, size);
@@ -17,6 +18,20 @@ static Obj* allocateObject(size_t size, ObjType type)
     object->next = vm.objects;
     vm.objects = object;
     return object;
+}
+
+void viewInterned()
+{
+    printf("== Interned [%d/%d] ==\n", vm.strings.count, vm.strings.capacity);
+    for (int i = 0; i < vm.strings.capacity; i++) {
+        Entry* entry = &vm.strings.entries[i];
+        if (entry->key == NULL) {
+            printf("  [%d] NULL = '%d'\n", i, entry->as.uint32);
+        } else {
+            printf("  [%d] %s = '%d'\n", i, entry->key->chars, entry->as.uint32);
+        }
+    }
+    printf("==================\n");
 }
 
 static ObjString* allocateString(char* chars, int length, uint32_t hash)

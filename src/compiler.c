@@ -5,6 +5,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+#include "util/LocalVarArray.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -47,8 +48,10 @@ typedef struct {
 typedef struct {
     Table identifiers;
     uint32_t identifiersCount;
-    Local locals[UINT8_COUNT];
-    int localCount;
+
+    Table localNames;
+    LocalVarArray localDepths;
+
     int scopeDepth;
 } Compiler;
 
@@ -172,7 +175,10 @@ static void initCompiler(Compiler* compiler)
 {
     initTable(&compiler->identifiers);
     compiler->identifiersCount = 0;
-    compiler->localCount = 0;
+
+    initTable(&compiler->localNames);
+    initLocalVarArray(&compiler->localDepths);
+
     compiler->scopeDepth = 0;
     current = compiler;
 }
@@ -180,6 +186,10 @@ static void initCompiler(Compiler* compiler)
 static void freeCompiler(Compiler* compiler)
 {
     freeTable(&compiler->identifiers);
+
+    freeTable(&compiler->localNames);
+    freeLocalVarArray(&compiler->localDepths);
+
     initCompiler(compiler);
 }
 
@@ -203,10 +213,19 @@ static void beginScope()
 static void endScope()
 {
     current->scopeDepth--;
-    while (current->localCount > 0
-        && current->locals[current->localCount - 1].depth > current->scopeDepth) {
+
+    while (current->localDepths.count > 0
+        && current->localDepths.values[current->localDepths.count - 1].depth
+            > current->scopeDepth) {
+
+        LocalVar* local = &current->localDepths.values[current->localDepths.count - 1];
+        if (local->shadowAddr != -1) {
+            tableSetUint32(&current->localNames, local->identifier, local->shadowAddr);
+        } else {
+            tableDelete(&current->localNames, local->identifier);
+        }
         emitByte(OP_POP);
-        current->localCount--;
+        current->localDepths.count--;
     }
 }
 
@@ -436,38 +455,35 @@ static uint32_t identifierConstant(Token* name)
     return addr;
 }
 
-static bool identifiersEqual(Token* a, Token* b)
-{
-    if (a->length != b->length) {
-        return false;
-    }
-    return memcmp(a->start, b->start, a->length) == 0;
-}
-
 static int resolveLocal(Compiler* compiler, Token* name)
 {
-    for (int i = compiler->localCount - 1; i >= 0; i--) {
-        Local* local = &compiler->locals[i];
-        if (identifiersEqual(name, &local->name)) {
-            if (local->depth == -1) {
-                error("Can't read local variable in its own initializer.");
-            }
-            return i;
+    ObjString* identifier = copyString(name->start, name->length);
+    uint32_t addr;
+    if (tableGetUint32(&compiler->localNames, identifier, &addr)) {
+        if (compiler->localDepths.values[addr].depth == -1) {
+            error("Can't read local variable in its own initializer.");
         }
+        return addr;
     }
-
     return -1;
 }
 
 static void addLocal(Token name)
 {
-    if (current->localCount == UINT8_COUNT) {
-        error("Too many local variables in function.");
-        return;
+    ObjString* identifier = copyString(name.start, name.length);
+
+    uint32_t addr;
+    if (tableGetUint32(&current->localNames, identifier, &addr)) {
+
+        tableSetUint32(&current->localNames, identifier, current->localDepths.count);
+        writeLocalVarArray(&current->localDepths,
+            (LocalVar) { .identifier = identifier, .depth = -1, .shadowAddr = addr });
+
+    } else {
+        tableSetUint32(&current->localNames, identifier, current->localDepths.count);
+        writeLocalVarArray(&current->localDepths,
+            (LocalVar) { .identifier = identifier, .depth = -1, .shadowAddr = -1 });
     }
-    Local* local = &current->locals[current->localCount++];
-    local->name = name;
-    local->depth = -1;
 }
 
 static void declareVariable()
@@ -476,14 +492,10 @@ static void declareVariable()
         return;
 
     Token* name = &parser.previous;
-
-    for (int i = current->localCount - 1; i >= 0; i--) {
-        Local* local = &current->locals[i];
-        if (local->depth != -1 && local->depth < current->scopeDepth) {
-            break;
-        }
-
-        if (identifiersEqual(name, &local->name)) {
+    ObjString* identifier = copyString(name->start, name->length);
+    uint32_t addr;
+    if (tableGetUint32(&current->localNames, identifier, &addr)) {
+        if (current->localDepths.values[addr].depth == current->scopeDepth) {
             error("Already a variable with this name in this scope.");
         }
     }
@@ -505,7 +517,7 @@ static uint32_t parseVariable(const char* errorMessage)
 
 static void markInitialized()
 {
-    current->locals[current->localCount - 1].depth = current->scopeDepth;
+    current->localDepths.values[current->localDepths.count - 1].depth = current->scopeDepth;
 }
 
 static void defineVariable(uint32_t global)
