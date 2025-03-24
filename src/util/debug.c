@@ -111,17 +111,17 @@ int disassembleInstruction(Chunk* chunk, int offset)
     case OP_SET_LOCAL_LONG:
         return uint24Instruction("OP_SET_LOCAL_LONG", chunk, offset);
     case OP_GET_GLOBAL:
-        return constantInstruction("OP_GET_GLOBAL", chunk, offset);
+        return byteInstruction("OP_GET_GLOBAL", chunk, offset);
     case OP_GET_GLOBAL_LONG:
-        return constantLongInstruction("OP_GET_GLOBAL_LONG", chunk, offset);
+        return uint24Instruction("OP_GET_GLOBAL_LONG", chunk, offset);
     case OP_DEFINE_GLOBAL:
-        return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
+        return byteInstruction("OP_DEFINE_GLOBAL", chunk, offset);
     case OP_DEFINE_GLOBAL_LONG:
-        return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
+        return uint24Instruction("OP_DEFINE_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL:
-        return constantInstruction("OP_SET_GLOBAL", chunk, offset);
+        return byteInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL_LONG:
-        return constantInstruction("OP_SET_GLOBAL_LONG", chunk, offset);
+        return uint24Instruction("OP_SET_GLOBAL_LONG", chunk, offset);
     case OP_EQUAL:
         return simpleInstruction("OP_EQUAL", offset);
     case OP_NOT_EQUAL:

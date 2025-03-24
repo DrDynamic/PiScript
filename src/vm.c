@@ -73,26 +73,35 @@ void initVM()
 {
     resetStack();
     vm.objects = NULL;
-    initTable(&vm.globals);
+    initValueArray(&vm.globals);
     initTable(&vm.strings);
 }
 
 void freeVM()
 {
-    freeTable(&vm.globals);
+    freeValueArray(&vm.globals);
     freeTable(&vm.strings);
     freeObjects();
 }
 
-static inline uint32_t makeUint24(uint8_t addr1, uint8_t addr2, uint8_t addr3)
+static inline uint32_t readUint24()
 {
+    uint8_t addr1 = *vm.ip++;
+    uint8_t addr2 = *vm.ip++;
+    uint8_t addr3 = *vm.ip++;
     return (addr1 << 16) | (addr2 << 8) | addr3;
+}
+
+static inline bool checkGlobalDefined(uint32_t addr)
+{
+    return addr >= vm.globals.count
+        || (IS_OBJ(vm.globals.values[addr]) && vm.globals.values[addr].as.obj == NULL);
 }
 
 static InterpretResult run()
 {
 #define READ_BYTE() (*vm.ip++)
-#define READ_UINT_24() (makeUint24(READ_BYTE(), READ_BYTE(), READ_BYTE()))
+#define READ_UINT_24() readUint24()
 #define GET_CONSTANT(addr) (vm.chunk->constants.values[addr])
 #define GET_STRING(addr) AS_STRING(GET_CONSTANT(addr))
 #define BINARY_OP(valueType, op)                                                                   \
@@ -207,59 +216,57 @@ static InterpretResult run()
             break;
         }
         case OP_GET_GLOBAL: {
-            uint8_t addr = READ_BYTE();
-            ObjString* name = GET_STRING(addr);
-            Value value;
-            if (!tableGet(&vm.globals, name, &value)) {
-                runtimeError("Undefined variable '%s'.", name->chars);
+            uint32_t addr = READ_BYTE();
+            if (checkGlobalDefined(addr)) {
+                runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
-            push(value);
+            push(vm.globals.values[addr]);
             break;
         }
         case OP_GET_GLOBAL_LONG: {
-            uint8_t addr = READ_UINT_24();
-            ObjString* name = GET_STRING(addr);
-            Value value;
-            if (!tableGet(&vm.globals, name, &value)) {
-                runtimeError("Undefined variable '%s'.", name->chars);
+            uint32_t addr = READ_UINT_24();
+            if (checkGlobalDefined(addr)) {
+                runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
-            push(value);
+            push(vm.globals.values[addr]);
             break;
         }
         case OP_DEFINE_GLOBAL: {
             uint8_t addr = READ_BYTE();
-            ObjString* name = GET_STRING(addr);
-            tableSet(&vm.globals, name, peek(0));
+            while (addr >= vm.globals.count) {
+                writeValueArray(&vm.globals, OBJ_VAL(NULL));
+            }
+            vm.globals.values[addr] = peek(0);
             pop();
             break;
         }
         case OP_DEFINE_GLOBAL_LONG: {
             uint32_t addr = READ_UINT_24();
-            ObjString* name = GET_STRING(addr);
-            tableSet(&vm.globals, name, peek(0));
+            while (addr >= vm.globals.count) {
+                writeValueArray(&vm.globals, OBJ_VAL(NULL));
+            }
+            vm.globals.values[addr] = peek(0);
             pop();
             break;
         }
         case OP_SET_GLOBAL: {
             uint8_t addr = READ_BYTE();
-            ObjString* name = GET_STRING(addr);
-            if (tableSet(&vm.globals, name, peek(0))) {
-                tableDelete(&vm.globals, name);
-                runtimeError("Undefined variable '%s'.", name->chars);
+            if (checkGlobalDefined(addr)) {
+                runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
+            vm.globals.values[addr] = peek(0);
             break;
         }
         case OP_SET_GLOBAL_LONG: {
             uint8_t addr = READ_UINT_24();
-            ObjString* name = GET_STRING(addr);
-            if (tableSet(&vm.globals, name, peek(0))) {
-                tableDelete(&vm.globals, name);
-                runtimeError("Undefined variable '%s'.", name->chars);
+            if (checkGlobalDefined(addr)) {
+                runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
             }
+            vm.globals.values[addr] = peek(0);
             break;
         }
         case OP_EQUAL: {
