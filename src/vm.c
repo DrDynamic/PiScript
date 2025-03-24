@@ -84,14 +84,6 @@ void freeVM()
     freeObjects();
 }
 
-static inline uint32_t readUint24()
-{
-    uint8_t addr1 = *vm.ip++;
-    uint8_t addr2 = *vm.ip++;
-    uint8_t addr3 = *vm.ip++;
-    return (addr1 << 16) | (addr2 << 8) | addr3;
-}
-
 static inline bool checkGlobalDefined(uint32_t addr)
 {
     return addr >= vm.globals.count
@@ -101,7 +93,8 @@ static inline bool checkGlobalDefined(uint32_t addr)
 static InterpretResult run()
 {
 #define READ_BYTE() (*vm.ip++)
-#define READ_UINT_24() readUint24()
+#define READ_UINT16() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
+#define READ_UINT24() (vm.ip += 3, (uint32_t)((vm.ip[-3] << 16) | (vm.ip[-2] << 8) | vm.ip[-1]))
 #define GET_CONSTANT(addr) (vm.chunk->constants.values[addr])
 #define GET_STRING(addr) AS_STRING(GET_CONSTANT(addr))
 #define BINARY_OP(valueType, op)                                                                   \
@@ -168,6 +161,23 @@ static InterpretResult run()
             printf("\n");
             break;
         }
+        case OP_JUMP: {
+            uint16_t offset = READ_UINT16();
+            vm.ip += offset;
+            break;
+        }
+        case OP_JUMP_IF_FALSE: {
+            uint16_t offset = READ_UINT16();
+            if (isFalsey(peek(0))) {
+                vm.ip += offset;
+            }
+            break;
+        }
+        case OP_LOOP: {
+            uint16_t offset = READ_UINT16();
+            vm.ip -= offset;
+            break;
+        }
         case OP_RETURN: {
             return INTERPRET_OK;
         }
@@ -178,7 +188,7 @@ static InterpretResult run()
             break;
         }
         case OP_CONSTANT_LONG: {
-            uint32_t addr = READ_UINT_24();
+            uint32_t addr = READ_UINT24();
             Value constant = GET_CONSTANT(addr);
             push(constant);
             break;
@@ -201,7 +211,7 @@ static InterpretResult run()
             break;
         }
         case OP_GET_LOCAL_LONG: {
-            uint32_t slot = READ_UINT_24();
+            uint32_t slot = READ_UINT24();
             push(vm.stack[slot]);
             break;
         }
@@ -211,7 +221,7 @@ static InterpretResult run()
             break;
         }
         case OP_SET_LOCAL_LONG: {
-            uint32_t slot = READ_UINT_24();
+            uint32_t slot = READ_UINT24();
             vm.stack[slot] = peek(0);
             break;
         }
@@ -225,7 +235,7 @@ static InterpretResult run()
             break;
         }
         case OP_GET_GLOBAL_LONG: {
-            uint32_t addr = READ_UINT_24();
+            uint32_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
                 runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
@@ -243,7 +253,7 @@ static InterpretResult run()
             break;
         }
         case OP_DEFINE_GLOBAL_LONG: {
-            uint32_t addr = READ_UINT_24();
+            uint32_t addr = READ_UINT24();
             while (addr >= vm.globals.count) {
                 writeValueArray(&vm.globals, OBJ_VAL(NULL));
             }
@@ -261,7 +271,7 @@ static InterpretResult run()
             break;
         }
         case OP_SET_GLOBAL_LONG: {
-            uint8_t addr = READ_UINT_24();
+            uint8_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
                 runtimeError("Undefined variable.");
                 return INTERPRET_RUNTIME_ERROR;
@@ -300,7 +310,8 @@ static InterpretResult run()
     }
 
 #undef READ_BYTE
-#undef READ_UINT_24
+#undef READ_UINT16
+#undef READ_UINT24
 #undef GET_CONSTANT
 #undef GET_STRING
 #undef BINARY_OP
