@@ -173,6 +173,11 @@ static InterpretResult run()
             }
             break;
         }
+        case OP_LOOP: {
+            uint16_t offset = READ_UINT16();
+            vm.ip -= offset;
+            break;
+        }
         case OP_RETURN: {
             return INTERPRET_OK;
         }
