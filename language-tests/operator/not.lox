@@ -9,5 +9,3 @@ print !nil;     // expect: true
 
 print !"";       // expect: false
 
-//fun foo() {}
-//print !foo;      // exp: false
