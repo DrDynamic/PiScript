@@ -1,0 +1,2 @@
+const a;
+print a; // expect: nil

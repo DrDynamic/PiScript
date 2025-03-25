@@ -1,0 +1,9 @@
+{
+  const a = "first";
+  print a; // expect: first
+}
+
+{
+  const a = "second";
+  print a; // expect: second
+}

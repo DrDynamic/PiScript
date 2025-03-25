@@ -1,0 +1,8 @@
+{
+  const a = "local";
+  {
+    const a = "shadow";
+    print a; // expect: shadow
+  }
+  print a; // expect: local
+}

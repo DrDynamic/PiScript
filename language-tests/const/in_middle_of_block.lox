@@ -1,0 +1,10 @@
+{
+  const a = "a";
+  print a; // expect: a
+  const b = a + " b";
+  print b; // expect: a b
+  const c = a + " c";
+  print c; // expect: a c
+  const d = b + " d";
+  print d; // expect: a b d
+}
