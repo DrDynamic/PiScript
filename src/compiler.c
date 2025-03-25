@@ -41,12 +41,8 @@ typedef struct {
 } ParseRule;
 
 typedef struct {
-    Token name;
-    int depth;
-} Local;
-
-typedef struct {
     Table identifiers;
+    LocalVarArray identifierProps;
     uint32_t identifiersCount;
 
     Table localNames;
@@ -208,6 +204,7 @@ static void patchJump(int offset)
 static void initCompiler(Compiler* compiler)
 {
     initTable(&compiler->identifiers);
+    initLocalVarArray(&compiler->identifierProps);
     compiler->identifiersCount = 0;
 
     initTable(&compiler->localNames);
@@ -220,6 +217,7 @@ static void initCompiler(Compiler* compiler)
 static void freeCompiler(Compiler* compiler)
 {
     freeTable(&compiler->identifiers);
+    freeLocalVarArray(&compiler->identifierProps);
 
     freeTable(&compiler->localNames);
     freeLocalVarArray(&compiler->localDepths);
@@ -376,13 +374,18 @@ static void namedVariable(Token name, bool canAssign)
     OpCode getOp, getOpLong, setOp, setOpLong;
 
     int addr = resolveLocal(current, &name);
+    LocalVar* var = NULL;
     if (addr != -1) {
+        var = &current->localDepths.values[addr];
+
         getOp = OP_GET_LOCAL;
         getOpLong = OP_GET_LOCAL_LONG;
         setOp = OP_SET_LOCAL;
         setOpLong = OP_SET_LOCAL_LONG;
     } else {
         addr = identifierConstant(&name);
+        var = &current->identifierProps.values[addr];
+
         getOp = OP_GET_GLOBAL;
         getOpLong = OP_GET_GLOBAL_LONG;
         setOp = OP_SET_GLOBAL;
@@ -392,6 +395,9 @@ static void namedVariable(Token name, bool canAssign)
     int line = parser.previous.line;
 
     if (canAssign && match(TOKEN_EQUAL)) {
+        if (var->readonly) {
+            error("Can not assign to constant.");
+        }
         expression();
         emitConstant(addr, line, setOp, setOpLong);
     } else {
@@ -462,6 +468,7 @@ ParseRule rules[] = {
     [TOKEN_THIS] = { NULL, NULL, PREC_NONE },
     [TOKEN_TRUE] = { literal, NULL, PREC_NONE },
     [TOKEN_VAR] = { NULL, NULL, PREC_NONE },
+    [TOKEN_CONST] = { NULL, NULL, PREC_NONE },
     [TOKEN_WHILE] = { NULL, NULL, PREC_NONE },
     [TOKEN_ERROR] = { NULL, NULL, PREC_NONE },
     [TOKEN_EOF] = { NULL, NULL, PREC_NONE },
@@ -500,6 +507,8 @@ static uint32_t identifierConstant(Token* name)
 
     addr = current->identifiersCount++;
     tableSetUint32(&current->identifiers, identifier, addr);
+    writeLocalVarArray(
+        &current->identifierProps, (LocalVar) { .identifier = identifier, .readonly = false });
 
     return addr;
 }
@@ -517,7 +526,7 @@ static int resolveLocal(Compiler* compiler, Token* name)
     return -1;
 }
 
-static void addLocal(Token name)
+static uint32_t addLocal(Token name)
 {
     ObjString* identifier = copyString(name.start, name.length);
 
@@ -526,19 +535,24 @@ static void addLocal(Token name)
 
         tableSetUint32(&current->localNames, identifier, current->localDepths.count);
         writeLocalVarArray(&current->localDepths,
-            (LocalVar) { .identifier = identifier, .depth = -1, .shadowAddr = addr });
+            (LocalVar) {
+                .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = addr });
 
     } else {
         tableSetUint32(&current->localNames, identifier, current->localDepths.count);
         writeLocalVarArray(&current->localDepths,
-            (LocalVar) { .identifier = identifier, .depth = -1, .shadowAddr = -1 });
+            (LocalVar) {
+                .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = -1 });
+        addr = current->localDepths.count - 1;
     }
+
+    return addr;
 }
 
-static void declareVariable()
+static uint32_t declareVariable()
 {
     if (current->scopeDepth == 0)
-        return;
+        return 0;
 
     Token* name = &parser.previous;
     ObjString* identifier = copyString(name->start, name->length);
@@ -549,16 +563,18 @@ static void declareVariable()
         }
     }
 
-    addLocal(*name);
+    addr = addLocal(*name);
+    return addr;
 }
 
 static uint32_t parseVariable(const char* errorMessage)
 {
     consume(TOKEN_IDENTIFIER, errorMessage);
 
-    declareVariable();
+    uint32_t localAddr = declareVariable();
     if (current->scopeDepth > 0) {
-        return 0;
+
+        return localAddr;
     }
 
     return identifierConstant(&parser.previous);
@@ -569,13 +585,15 @@ static void markInitialized()
     current->localDepths.values[current->localDepths.count - 1].depth = current->scopeDepth;
 }
 
-static void defineVariable(uint32_t global)
+static void defineVariable(uint32_t addr, bool readonly)
 {
     if (current->scopeDepth > 0) {
         markInitialized();
+        current->localDepths.values[addr].readonly = readonly;
         return;
     }
-    emitConstant(global, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
+    current->identifierProps.values[addr].readonly = readonly;
+    emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
 }
 
 static void and_(bool canAssign)
@@ -608,9 +626,9 @@ static void block()
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
-static void varDeclaration()
+static void varDeclaration(bool readonly)
 {
-    uint32_t global = parseVariable("Expect variable name.");
+    uint32_t addr = parseVariable("Expect variable name.");
 
     if (match(TOKEN_EQUAL)) {
         expression();
@@ -620,7 +638,7 @@ static void varDeclaration()
     match(TOKEN_SEMICOLON);
     //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
 
-    defineVariable(global);
+    defineVariable(addr, readonly);
 }
 
 static void expressionStatement()
@@ -638,7 +656,8 @@ static void forStatement()
     if (match(TOKEN_SEMICOLON)) {
         // no initializer.
     } else if (match(TOKEN_VAR)) {
-        varDeclaration();
+        varDeclaration(false);
+
     } else {
         expressionStatement();
     }
@@ -735,6 +754,7 @@ static void synchronize()
         case TOKEN_CLASS:
         case TOKEN_FUN:
         case TOKEN_VAR:
+        case TOKEN_CONST:
         case TOKEN_FOR:
         case TOKEN_IF:
         case TOKEN_WHILE:
@@ -750,7 +770,9 @@ static void synchronize()
 static void declaration()
 {
     if (match(TOKEN_VAR)) {
-        varDeclaration();
+        varDeclaration(false);
+    } else if (match(TOKEN_CONST)) {
+        varDeclaration(true);
     } else {
         statement();
     }

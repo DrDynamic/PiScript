@@ -7,6 +7,7 @@
 typedef struct {
     int depth;
     ObjString* identifier;
+    bool readonly;
     int shadowAddr;
 } LocalVar;
 
@@ -19,3 +20,5 @@ typedef struct {
 void initLocalVarArray(LocalVarArray* array);
 void writeLocalVarArray(LocalVarArray* array, LocalVar local);
 void freeLocalVarArray(LocalVarArray* array);
+
+void printVarArray(LocalVarArray* array, const char* title, ...);

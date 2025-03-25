@@ -1,0 +1,8 @@
+{
+  const a = "outer";
+  {
+    print a; // expect: outer
+    const a = "inner";
+    print a; // expect: inner
+  }
+}

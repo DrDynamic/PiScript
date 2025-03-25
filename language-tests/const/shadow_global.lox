@@ -1,0 +1,6 @@
+const a = "global";
+{
+  const a = "shadow";
+  print a; // expect: shadow
+}
+print a; // expect: global

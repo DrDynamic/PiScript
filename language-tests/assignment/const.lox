@@ -1,0 +1,2 @@
+const a = 1;
+a = 3;// Error at '=': Can not assign to constant.

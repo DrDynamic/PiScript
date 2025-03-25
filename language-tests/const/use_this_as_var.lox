@@ -1,0 +1,2 @@
+// [line 2] Error at 'this': Expect variable name.
+const this = "value";
