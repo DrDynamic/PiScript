@@ -5,7 +5,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
-#include "util/LocalVarArray.h"
+#include "util/VarArray.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -42,11 +42,11 @@ typedef struct {
 
 typedef struct {
     Table identifiers;
-    LocalVarArray identifierProps;
+    VarArray identifierProps;
     uint32_t identifiersCount;
 
     Table localNames;
-    LocalVarArray localDepths;
+    VarArray localProps;
 
     int scopeDepth;
 } Compiler;
@@ -204,11 +204,11 @@ static void patchJump(int offset)
 static void initCompiler(Compiler* compiler)
 {
     initTable(&compiler->identifiers);
-    initLocalVarArray(&compiler->identifierProps);
+    initVarArray(&compiler->identifierProps);
     compiler->identifiersCount = 0;
 
     initTable(&compiler->localNames);
-    initLocalVarArray(&compiler->localDepths);
+    initVarArray(&compiler->localProps);
 
     compiler->scopeDepth = 0;
     current = compiler;
@@ -217,10 +217,10 @@ static void initCompiler(Compiler* compiler)
 static void freeCompiler(Compiler* compiler)
 {
     freeTable(&compiler->identifiers);
-    freeLocalVarArray(&compiler->identifierProps);
+    freeVarArray(&compiler->identifierProps);
 
     freeTable(&compiler->localNames);
-    freeLocalVarArray(&compiler->localDepths);
+    freeVarArray(&compiler->localProps);
 
     initCompiler(compiler);
 }
@@ -246,18 +246,17 @@ static void endScope()
 {
     current->scopeDepth--;
 
-    while (current->localDepths.count > 0
-        && current->localDepths.values[current->localDepths.count - 1].depth
-            > current->scopeDepth) {
+    while (current->localProps.count > 0
+        && current->localProps.values[current->localProps.count - 1].depth > current->scopeDepth) {
 
-        LocalVar* local = &current->localDepths.values[current->localDepths.count - 1];
+        Var* local = &current->localProps.values[current->localProps.count - 1];
         if (local->shadowAddr != -1) {
             tableSetUint32(&current->localNames, local->identifier, local->shadowAddr);
         } else {
             tableDelete(&current->localNames, local->identifier);
         }
         emitByte(OP_POP);
-        current->localDepths.count--;
+        current->localProps.count--;
     }
 }
 
@@ -374,9 +373,9 @@ static void namedVariable(Token name, bool canAssign)
     OpCode getOp, getOpLong, setOp, setOpLong;
 
     int addr = resolveLocal(current, &name);
-    LocalVar* var = NULL;
+    Var* var = NULL;
     if (addr != -1) {
-        var = &current->localDepths.values[addr];
+        var = &current->localProps.values[addr];
 
         getOp = OP_GET_LOCAL;
         getOpLong = OP_GET_LOCAL_LONG;
@@ -507,8 +506,7 @@ static uint32_t identifierConstant(Token* name)
 
     addr = current->identifiersCount++;
     tableSetUint32(&current->identifiers, identifier, addr);
-    writeLocalVarArray(
-        &current->identifierProps, (LocalVar) { .identifier = identifier, .readonly = false });
+    writeVarArray(&current->identifierProps, (Var) { .identifier = identifier, .readonly = false });
 
     return addr;
 }
@@ -518,7 +516,7 @@ static int resolveLocal(Compiler* compiler, Token* name)
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
     if (tableGetUint32(&compiler->localNames, identifier, &addr)) {
-        if (compiler->localDepths.values[addr].depth == -1) {
+        if (compiler->localProps.values[addr].depth == -1) {
             error("Can't read local variable in its own initializer.");
         }
         return addr;
@@ -533,17 +531,15 @@ static uint32_t addLocal(Token name)
     uint32_t addr;
     if (tableGetUint32(&current->localNames, identifier, &addr)) {
 
-        tableSetUint32(&current->localNames, identifier, current->localDepths.count);
-        writeLocalVarArray(&current->localDepths,
-            (LocalVar) {
-                .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = addr });
+        tableSetUint32(&current->localNames, identifier, current->localProps.count);
+        writeVarArray(&current->localProps,
+            (Var) { .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = addr });
 
     } else {
-        tableSetUint32(&current->localNames, identifier, current->localDepths.count);
-        writeLocalVarArray(&current->localDepths,
-            (LocalVar) {
-                .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = -1 });
-        addr = current->localDepths.count - 1;
+        tableSetUint32(&current->localNames, identifier, current->localProps.count);
+        writeVarArray(&current->localProps,
+            (Var) { .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = -1 });
+        addr = current->localProps.count - 1;
     }
 
     return addr;
@@ -558,7 +554,7 @@ static uint32_t declareVariable()
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
     if (tableGetUint32(&current->localNames, identifier, &addr)) {
-        if (current->localDepths.values[addr].depth == current->scopeDepth) {
+        if (current->localProps.values[addr].depth == current->scopeDepth) {
             error("Already a variable with this name in this scope.");
         }
     }
@@ -582,14 +578,14 @@ static uint32_t parseVariable(const char* errorMessage)
 
 static void markInitialized()
 {
-    current->localDepths.values[current->localDepths.count - 1].depth = current->scopeDepth;
+    current->localProps.values[current->localProps.count - 1].depth = current->scopeDepth;
 }
 
 static void defineVariable(uint32_t addr, bool readonly)
 {
     if (current->scopeDepth > 0) {
         markInitialized();
-        current->localDepths.values[addr].readonly = readonly;
+        current->localProps.values[addr].readonly = readonly;
         return;
     }
     current->identifierProps.values[addr].readonly = readonly;
