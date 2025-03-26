@@ -27,6 +27,12 @@ static void freeObject(Obj* object)
         FREE(ObjString, object);
         break;
     }
+    case OBJ_FUNCTION: {
+        ObjFunction* function = (ObjFunction*)object;
+        freeChunk(&function->chunk);
+        FREE(ObjFunction, object);
+        break;
+    }
     default:
         printf("FATAL: could not free object of type %d (no implementation)", object->type);
         break;
