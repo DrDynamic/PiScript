@@ -1,35 +1,35 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "LocalVarArray.h"
+#include "VarArray.h"
 #include "memory.h"
 
-void initLocalVarArray(LocalVarArray* array)
+void initVarArray(VarArray* array)
 {
     array->count = 0;
     array->capacity = 0;
     array->values = NULL;
 }
 
-void writeLocalVarArray(LocalVarArray* array, LocalVar local)
+void writeVarArray(VarArray* array, Var local)
 {
     if (array->capacity < array->count + 1) {
         int oldCapacity = array->capacity;
         array->capacity = GROW_CAPACITY(oldCapacity);
-        array->values = GROW_ARRAY(LocalVar, array->values, oldCapacity, array->capacity);
+        array->values = GROW_ARRAY(Var, array->values, oldCapacity, array->capacity);
     }
 
     array->values[array->count] = local;
     array->count++;
 }
 
-void freeLocalVarArray(LocalVarArray* array)
+void freeVarArray(VarArray* array)
 {
-    FREE_ARRAY(LocalVar, array->values, array->capacity);
-    initLocalVarArray(array);
+    FREE_ARRAY(Var, array->values, array->capacity);
+    initVarArray(array);
 }
 
-void printVarArray(LocalVarArray* array, const char* title, ...)
+void printVarArray(VarArray* array, const char* title, ...)
 {
     printf("==== ");
     va_list args;
@@ -39,7 +39,7 @@ void printVarArray(LocalVarArray* array, const char* title, ...)
     printf("[%d/%d] ====\n", array->count, array->capacity);
 
     for (unsigned int i = 0; i < array->count; i++) {
-        LocalVar* var = &array->values[i];
+        Var* var = &array->values[i];
         printf("%02d - {identifier: %s, shadows: %d, depth: %d, %s}\n", i, var->identifier->chars,
             var->shadowAddr, var->depth, var->readonly ? "readonly" : "read-write");
     }
