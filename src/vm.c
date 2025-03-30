@@ -8,6 +8,7 @@
 #include "debug.h"
 #include "object.h"
 #include "memory.h"
+#include "natives.h"
 
 VM vm;
 
@@ -40,6 +41,7 @@ static void runtimeError(const char* format, ...)
 
     resetStack();
 }
+
 
 void push(Value value)
 {
@@ -83,6 +85,14 @@ static bool callValue(Value callee, int argCount)
         switch (OBJ_TYPE(callee)) {
         case OBJ_FUNCTION:
             return call(AS_FUNCTION(callee), argCount);
+        case OBJ_NATIVE: {
+            NativeFn native = AS_NATIVE(callee);
+            Value result = native(argCount, vm.stackTop - argCount);
+            vm.stackTop -= argCount + 1;
+            push(result);
+            return true;
+        }
+
         default:
             break;
         }
@@ -121,6 +131,8 @@ void initVM()
     initTable(&vm.globalAddresses);
     initVarArray(&vm.globalProps);
     vm.globalCount = 0;
+
+    defineNatives();
 }
 
 void freeVM()

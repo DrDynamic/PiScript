@@ -128,6 +128,7 @@ static bool match(TokenType type)
     return true;
 }
 
+
 static void emitByte(uint8_t byte)
 {
     writeChunk(currentChunk(), byte, parser.previous.line);
@@ -887,6 +888,17 @@ static void statement()
     } else {
         expressionStatement();
     }
+}
+
+void defineNative(const char* name, NativeFn function)
+{
+    ObjString* identifier = copyString(name, (int)strlen(name));
+    ObjNative* native = newNative(function);
+
+    uint32_t addr = vm.globalCount++;
+    tableSetUint32(&vm.globalAddresses, identifier, addr);
+    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = true });
+    writeValueArray(&vm.globals, OBJ_VAL(native));
 }
 
 ObjFunction* compile(const char* source)
