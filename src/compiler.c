@@ -47,10 +47,6 @@ typedef struct Compiler {
     ObjFunction* function;
     FunctionType type;
 
-    Table identifiers;
-    VarArray identifierProps;
-    uint32_t identifiersCount;
-
     Table localNames;
     VarArray localProps;
 
@@ -212,10 +208,6 @@ static void initCompiler(Compiler* compiler, FunctionType type)
     compiler->function = NULL;
     compiler->type = type;
 
-    initTable(&compiler->identifiers);
-    initVarArray(&compiler->identifierProps);
-    compiler->identifiersCount = 0;
-
     initTable(&compiler->localNames);
     initVarArray(&compiler->localProps);
 
@@ -233,9 +225,6 @@ static void initCompiler(Compiler* compiler, FunctionType type)
 
 static void freeCompiler(Compiler* compiler)
 {
-    freeTable(&compiler->identifiers);
-    freeVarArray(&compiler->identifierProps);
-
     freeTable(&compiler->localNames);
     freeVarArray(&compiler->localProps);
 
@@ -413,7 +402,7 @@ static void namedVariable(Token name, bool canAssign)
         setOpLong = OP_SET_LOCAL_LONG;
     } else {
         addr = identifierConstant(&name);
-        var = &current->identifierProps.values[addr];
+        var = &vm.globalProps.values[addr];
 
         getOp = OP_GET_GLOBAL;
         getOpLong = OP_GET_GLOBAL_LONG;
@@ -530,13 +519,13 @@ static uint32_t identifierConstant(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&current->identifiers, identifier, &addr)) {
+    if (tableGetUint32(&vm.globalAddresses, identifier, &addr)) {
         return addr;
     }
 
-    addr = current->identifiersCount++;
-    tableSetUint32(&current->identifiers, identifier, addr);
-    writeVarArray(&current->identifierProps, (Var) { .identifier = identifier, .readonly = false });
+    addr = vm.globalCount++;
+    tableSetUint32(&vm.globalAddresses, identifier, addr);
+    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = false });
 
     return addr;
 }
@@ -621,7 +610,7 @@ static void defineVariable(uint32_t addr, bool readonly)
         return;
     }
 
-    current->identifierProps.values[addr].readonly = readonly;
+    vm.globalProps.values[addr].readonly = readonly;
     emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
 }
 

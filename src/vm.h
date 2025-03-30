@@ -3,6 +3,7 @@
 #include "object.h"
 #include "table.h"
 #include "value.h"
+#include "util/VarArray.h"
 
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
@@ -21,6 +22,11 @@ typedef struct {
     Value stack[STACK_MAX];
     Value* stackTop;
     ValueArray globals;
+
+    Table globalAddresses;
+    VarArray globalProps;
+    uint32_t globalCount;
+
     Table strings;
     Obj* objects;
 } VM;

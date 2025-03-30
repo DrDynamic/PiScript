@@ -117,6 +117,10 @@ void initVM()
     vm.objects = NULL;
     initValueArray(&vm.globals);
     initTable(&vm.strings);
+
+    initTable(&vm.globalAddresses);
+    initVarArray(&vm.globalProps);
+    vm.globalCount = 0;
 }
 
 void freeVM()
@@ -124,6 +128,10 @@ void freeVM()
     freeValueArray(&vm.globals);
     freeTable(&vm.strings);
     freeObjects();
+
+    freeTable(&vm.globalAddresses);
+    freeVarArray(&vm.globalProps);
+    vm.globalCount = 0;
 }
 
 static inline bool checkGlobalDefined(uint32_t addr)
