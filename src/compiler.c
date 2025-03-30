@@ -290,6 +290,7 @@ static uint32_t identifierConstant(Token* name);
 static int resolveLocal(Compiler* compiler, Token* name);
 static void and_(bool canAssign);
 static void or_(bool canAssign);
+static uint8_t argumentList();
 
 static void binary(bool canAssign)
 {
@@ -332,6 +333,14 @@ static void binary(bool canAssign)
     default:
         return;
     }
+}
+
+static void call(bool canAssign)
+{
+    (void)canAssign;
+    uint8_t argCount = argumentList();
+    emitByte(OP_CALL);
+    emitByte(argCount);
 }
 
 static void literal(bool canAssign)
@@ -451,7 +460,7 @@ static void unary(bool canAssign)
 }
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = { grouping, NULL, PREC_NONE },
+    [TOKEN_LEFT_PAREN] = { grouping, call, PREC_CALL },
     [TOKEN_RIGHT_PAREN] = { NULL, NULL, PREC_NONE },
     [TOKEN_LEFT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_RIGHT_BRACE] = { NULL, NULL, PREC_NONE },
@@ -522,12 +531,10 @@ static uint32_t identifierConstant(Token* name)
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
     if (tableGetUint32(&current->identifiers, identifier, &addr)) {
-        printf("identifier exists %d\n", addr);
         return addr;
     }
 
     addr = current->identifiersCount++;
-    printf("create identifier %d\n", addr);
     tableSetUint32(&current->identifiers, identifier, addr);
     writeVarArray(&current->identifierProps, (Var) { .identifier = identifier, .readonly = false });
 
@@ -613,9 +620,26 @@ static void defineVariable(uint32_t addr, bool readonly)
         current->localProps.values[addr].readonly = readonly;
         return;
     }
-    printVarArray(&current->identifierProps, "defineVar");
+
     current->identifierProps.values[addr].readonly = readonly;
     emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
+}
+
+
+static uint8_t argumentList()
+{
+    uint8_t argCount = 0;
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            expression();
+            if (argCount == 255) {
+                error("Can't have more than 255 arguments.");
+            }
+            argCount++;
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+    return argCount;
 }
 
 static void and_(bool canAssign)
