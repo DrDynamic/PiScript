@@ -126,7 +126,7 @@ static InterpretResult run()
         }
         printf("\n");
         disassembleInstruction(
-            &frame->function->chunk, (int)(frame.ip - frame->function->chunk.code));
+            &frame->function->chunk, (int)(frame->ip - frame->function->chunk.code));
 #endif
 
         uint8_t instruction;
@@ -336,6 +336,5 @@ InterpretResult interpret(const char* source)
     frame->ip = function->chunk.code;
     frame->slots = vm.stack;
 
-    InterpretResult result = run();
-    return result;
+    return run();
 }

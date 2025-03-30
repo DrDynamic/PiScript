@@ -42,7 +42,8 @@ typedef struct {
 
 typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
 
-typedef struct {
+typedef struct Compiler {
+    struct Compiler* enclosing;
     ObjFunction* function;
     FunctionType type;
 
@@ -142,7 +143,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2)
     emitByte(byte1);
     emitByte(byte2);
 }
-    */
+*/
 
 static void emitLoop(int loopStart)
 {
@@ -205,10 +206,11 @@ static void patchJump(int offset)
     currentChunk()->code[offset + 1] = jump & 0xFF;
 }
 
-static void initCompiler(Compiler* compiler)
+static void initCompiler(Compiler* compiler, FunctionType type)
 {
+    compiler->enclosing = current;
     compiler->function = NULL;
-    compiler->type = TYPE_SCRIPT;
+    compiler->type = type;
 
     initTable(&compiler->identifiers);
     initVarArray(&compiler->identifierProps);
@@ -220,6 +222,10 @@ static void initCompiler(Compiler* compiler)
     compiler->scopeDepth = 0;
     compiler->function = newFunction();
     current = compiler;
+
+    if (type != TYPE_SCRIPT) {
+        current->function->name = copyString(parser.previous.start, parser.previous.length);
+    }
 
     writeVarArray(&current->localProps,
         (Var) { .depth = -1, .identifier = NULL, .shadowAddr = -1, .readonly = true });
@@ -233,7 +239,7 @@ static void freeCompiler(Compiler* compiler)
     freeTable(&compiler->localNames);
     freeVarArray(&compiler->localProps);
 
-    initCompiler(compiler);
+    initCompiler(compiler, TYPE_SCRIPT);
 }
 
 static ObjFunction* endCompiler()
@@ -246,7 +252,9 @@ static ObjFunction* endCompiler()
             currentChunk(), function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
-
+    // TODO: fix memory leak
+    //    freeCompiler(current);
+    current = current->enclosing;
     return function;
 }
 
@@ -514,10 +522,12 @@ static uint32_t identifierConstant(Token* name)
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
     if (tableGetUint32(&current->identifiers, identifier, &addr)) {
+        printf("identifier exists %d\n", addr);
         return addr;
     }
 
     addr = current->identifiersCount++;
+    printf("create identifier %d\n", addr);
     tableSetUint32(&current->identifiers, identifier, addr);
     writeVarArray(&current->identifierProps, (Var) { .identifier = identifier, .readonly = false });
 
@@ -582,7 +592,6 @@ static uint32_t parseVariable(const char* errorMessage)
 
     uint32_t localAddr = declareVariable();
     if (current->scopeDepth > 0) {
-
         return localAddr;
     }
 
@@ -591,6 +600,9 @@ static uint32_t parseVariable(const char* errorMessage)
 
 static void markInitialized()
 {
+    if (current->scopeDepth == 0) {
+        return;
+    }
     current->localProps.values[current->localProps.count - 1].depth = current->scopeDepth;
 }
 
@@ -601,6 +613,7 @@ static void defineVariable(uint32_t addr, bool readonly)
         current->localProps.values[addr].readonly = readonly;
         return;
     }
+    printVarArray(&current->identifierProps, "defineVar");
     current->identifierProps.values[addr].readonly = readonly;
     emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
 }
@@ -633,6 +646,40 @@ static void block()
     }
 
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+}
+
+static void function(FunctionType type)
+{
+    Compiler compiler;
+    initCompiler(&compiler, type);
+    beginScope();
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            current->function->arity++;
+            if (current->function->arity > 255) {
+                errorAtCurrent("Can't have more than 255 parameters.");
+            }
+            uint8_t constant = parseVariable("Expect parameter name");
+            defineVariable(constant, false);
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    block();
+
+    ObjFunction* function = endCompiler();
+    emitConstant(
+        makeConstant(OBJ_VAL(function)), parser.previous.line, OP_CONSTANT, OP_CONSTANT_LONG);
+}
+
+static void funDeclaration()
+{
+    uint8_t addr = parseVariable("Expect function name.");
+    markInitialized();
+    function(TYPE_FUNCTION);
+    defineVariable(addr, true);
 }
 
 static void varDeclaration(bool readonly)
@@ -778,7 +825,9 @@ static void synchronize()
 
 static void declaration()
 {
-    if (match(TOKEN_VAR)) {
+    if (match(TOKEN_FUN)) {
+        funDeclaration();
+    } else if (match(TOKEN_VAR)) {
         varDeclaration(false);
     } else if (match(TOKEN_CONST)) {
         varDeclaration(true);
@@ -813,7 +862,7 @@ ObjFunction* compile(const char* source)
 {
     initScanner(source);
     Compiler compiler;
-    initCompiler(&compiler);
+    initCompiler(&compiler, TYPE_SCRIPT);
 
     parser.hadError = false;
     parser.panicMode = false;
