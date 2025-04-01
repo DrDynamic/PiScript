@@ -686,7 +686,7 @@ static void function(FunctionType type)
 
     ObjFunction* function = endCompiler();
     emitConstant(
-        makeConstant(OBJ_VAL(function)), parser.previous.line, OP_CONSTANT, OP_CONSTANT_LONG);
+        makeConstant(OBJ_VAL(function)), parser.previous.line, OP_CLOSURE, OP_CLOSURE_LONG);
 }
 
 static void funDeclaration()
