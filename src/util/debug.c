@@ -2,6 +2,7 @@
 
 #include "debug.h"
 #include "value.h"
+#include "object.h"
 
 void disassembleChunk(Chunk* chunk, const char* name)
 {
@@ -70,6 +71,22 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk, int offset)
     return offset + 3;
 }
 
+static int closureInstruction(const char* name, uint32_t constantIndex, Chunk* chunk, int offset)
+{
+    printf("%-16s %4d ", "OP_CLOSURE", constantIndex);
+    printValue(chunk->constants.values[constantIndex]);
+    printf("\n");
+
+    ObjFunction* function = AS_FUNCTION(chunk->constants.values[constantIndex]);
+    for (int j = 0; j < function->upvalueCount; j++) {
+        int isLocal = chunk->code[offset++];
+        int index = chunk->code[offset++];
+        printf("%04d      |                     %s %d\n", offset - 2, isLocal ? "local" : "upvalue",
+            index);
+    }
+    return offset;
+}
+
 int disassembleInstruction(Chunk* chunk, int offset)
 {
     printf("[%04d] ", offset);
@@ -107,23 +124,19 @@ int disassembleInstruction(Chunk* chunk, int offset)
     case OP_CLOSURE: {
         offset++;
         uint8_t constant = chunk->code[offset++];
-        printf("%-16s %4d ", "OP_CLOSURE", constant);
-        printValue(chunk->constants.values[constant]);
-        printf("\n");
+
+        offset = closureInstruction("OP_CLOSURE", constant, chunk, offset);
         return offset;
     }
     case OP_CLOSURE_LONG: {
-        uint8_t idx1 = chunk->code[offset + 1];
-        uint8_t idx2 = chunk->code[offset + 2];
-        uint8_t idx3 = chunk->code[offset + 3];
-
+        offset++;
+        uint8_t idx1 = chunk->code[offset++];
+        uint8_t idx2 = chunk->code[offset++];
+        uint8_t idx3 = chunk->code[offset++];
         uint32_t constantIndex = (idx1 << 16) | (idx2 << 8) | idx3;
 
-        printf("%-16s %4d ", "OP_CLOSURE_LONG", constantIndex);
-        printValue(chunk->constants.values[constantIndex]);
-        printf("\n");
-
-        return offset + 4;
+        offset = closureInstruction("OP_CLOSURE_LONG", constantIndex, chunk, offset);
+        return offset;
     }
     case OP_RETURN:
         return simpleInstruction("OP_RETURN", offset);
@@ -159,6 +172,10 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return byteInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL_LONG:
         return uint24Instruction("OP_SET_GLOBAL_LONG", chunk, offset);
+    case OP_GET_UPVALUE:
+        return byteInstruction("OP_GET_UPVALUE", chunk, offset);
+    case OP_SET_UPVALUE:
+        return byteInstruction("OP_SET_UPVALUE", chunk, offset);
     case OP_EQUAL:
         return simpleInstruction("OP_EQUAL", offset);
     case OP_NOT_EQUAL:
