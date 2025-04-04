@@ -280,6 +280,7 @@ static void endScope()
     }
 }
 
+static int resolveUpvalue(Compiler* compiler, Token* name);
 static void expression();
 static void statement();
 static void declaration();
@@ -410,7 +411,7 @@ static void namedVariable(Token name, bool canAssign)
         getOpLong = OP_GET_LOCAL_LONG;
         setOp = OP_SET_LOCAL;
         setOpLong = OP_SET_LOCAL_LONG;
-    } else if ((addr = resolveUpValue(current, &name)) != -1) {
+    } else if ((addr = resolveUpvalue(current, &name)) != -1) {
         getOp = OP_GET_UPVALUE;
         getOpLong = 0xFF; // not supported
         setOp = OP_SET_UPVALUE;

@@ -190,6 +190,8 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return simpleInstruction("OP_LESS_EQUAL", offset);
     case OP_PRINT:
         return simpleInstruction("OP_PRINT", offset);
+    case OP_UNDEFINED:
+        return simpleInstruction("OP_UNDEFINED", offset);
     default:
         printf("unknown opcode: 0x%02X\n", instruction);
         return offset + 1;

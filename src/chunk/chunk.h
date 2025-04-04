@@ -44,6 +44,7 @@ typedef enum {
     OP_CLOSURE,
     OP_CLOSURE_LONG,
     OP_RETURN,
+    OP_UNDEFINED = 0xFF,
 } OpCode;
 
 typedef struct {
