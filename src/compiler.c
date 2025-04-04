@@ -230,7 +230,13 @@ static void initCompiler(Compiler* compiler, FunctionType type)
     }
 
     writeVarArray(&current->localProps,
-        (Var) { .depth = -1, .identifier = NULL, .shadowAddr = -1, .readonly = true });
+        (Var) {
+            .depth = -1,
+            .identifier = NULL,
+            .shadowAddr = -1,
+            .readonly = true,
+            .isCaptured = false,
+        });
 }
 
 static void freeCompiler(Compiler* compiler)
@@ -275,7 +281,12 @@ static void endScope()
         } else {
             tableDelete(&current->localNames, local->identifier);
         }
-        emitByte(OP_POP);
+        
+        if (current->localProps.values[current->localProps.count - 1].isCaptured) {
+            emitByte(OP_CLOSE_UPVALUE);
+        } else {
+            emitByte(OP_POP);
+        }
         current->localProps.count--;
     }
 }
@@ -588,6 +599,7 @@ static int resolveUpvalue(Compiler* compiler, Token* name)
 
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
+        compiler->enclosing->localProps.values[local].isCaptured = true;
         return addUpvalue(compiler, (uint32_t)local, true);
     }
 
@@ -608,12 +620,24 @@ static uint32_t addLocal(Token name)
 
         tableSetUint32(&current->localNames, identifier, current->localProps.count);
         writeVarArray(&current->localProps,
-            (Var) { .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = addr });
+            (Var) {
+                .identifier = identifier,
+                .depth = -1,
+                .readonly = false,
+                .shadowAddr = addr,
+                .isCaptured = false,
+            });
 
     } else {
         tableSetUint32(&current->localNames, identifier, current->localProps.count);
         writeVarArray(&current->localProps,
-            (Var) { .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = -1 });
+            (Var) {
+                .identifier = identifier,
+                .depth = -1,
+                .readonly = false,
+                .shadowAddr = -1,
+                .isCaptured = false,
+            });
         addr = current->localProps.count - 1;
     }
 

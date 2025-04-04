@@ -9,6 +9,7 @@ typedef struct {
     ObjString* identifier;
     bool readonly;
     int shadowAddr;
+    bool isCaptured;
 } Var;
 
 typedef struct {
