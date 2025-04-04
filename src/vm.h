@@ -28,6 +28,7 @@ typedef struct {
     uint32_t globalCount;
 
     Table strings;
+    ObjUpvalue* openUpvalues;
     Obj* objects;
 } VM;
 
