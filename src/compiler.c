@@ -45,6 +45,7 @@ typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
 typedef struct {
     uint8_t index;
     bool isLocal;
+    Var* varProps;
 } Upvalue;
 
 
@@ -281,7 +282,7 @@ static void endScope()
         } else {
             tableDelete(&current->localNames, local->identifier);
         }
-        
+
         if (current->localProps.values[current->localProps.count - 1].isCaptured) {
             emitByte(OP_CLOSE_UPVALUE);
         } else {
@@ -291,7 +292,7 @@ static void endScope()
     }
 }
 
-static int resolveUpvalue(Compiler* compiler, Token* name);
+static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps);
 static void expression();
 static void statement();
 static void declaration();
@@ -422,7 +423,7 @@ static void namedVariable(Token name, bool canAssign)
         getOpLong = OP_GET_LOCAL_LONG;
         setOp = OP_SET_LOCAL;
         setOpLong = OP_SET_LOCAL_LONG;
-    } else if ((addr = resolveUpvalue(current, &name)) != -1) {
+    } else if ((addr = resolveUpvalue(current, &name, &var)) != -1) {
         getOp = OP_GET_UPVALUE;
         getOpLong = 0xFF; // not supported
         setOp = OP_SET_UPVALUE;
@@ -570,7 +571,7 @@ static int resolveLocal(Compiler* compiler, Token* name)
     return -1;
 }
 
-static int addUpvalue(Compiler* compiler, uint32_t index, bool isLocal)
+static int addUpvalue(Compiler* compiler, uint32_t index, bool isLocal, Var* varProps)
 {
     int upvalueCount = compiler->function->upvalueCount;
 
@@ -588,10 +589,11 @@ static int addUpvalue(Compiler* compiler, uint32_t index, bool isLocal)
 
     compiler->upvalues[upvalueCount].isLocal = isLocal;
     compiler->upvalues[upvalueCount].index = index;
+    compiler->upvalues[upvalueCount].varProps = varProps;
     return compiler->function->upvalueCount++;
 }
 
-static int resolveUpvalue(Compiler* compiler, Token* name)
+static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps)
 {
     if (compiler->enclosing == NULL) {
         return -1;
@@ -600,12 +602,13 @@ static int resolveUpvalue(Compiler* compiler, Token* name)
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
         compiler->enclosing->localProps.values[local].isCaptured = true;
-        return addUpvalue(compiler, (uint32_t)local, true);
+        *varProps = &compiler->localProps.values[local];
+        return addUpvalue(compiler, (uint32_t)local, true, *varProps);
     }
 
-    int upvalue = resolveUpvalue(compiler->enclosing, name);
+    int upvalue = resolveUpvalue(compiler->enclosing, name, varProps);
     if (upvalue != -1) {
-        return addUpvalue(compiler, upvalue, false);
+        return addUpvalue(compiler, upvalue, false, *varProps);
     }
 
     return -1;

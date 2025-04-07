@@ -6,6 +6,8 @@
 
 static Value clockNative(int argCount, Value* args)
 {
+    (void)args;
+    (void)argCount;
     return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 

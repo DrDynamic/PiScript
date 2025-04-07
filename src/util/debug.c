@@ -73,7 +73,7 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk, int offset)
 
 static int closureInstruction(const char* name, uint32_t constantIndex, Chunk* chunk, int offset)
 {
-    printf("%-16s %4d ", "OP_CLOSURE", constantIndex);
+    printf("%-16s %4d ", name, constantIndex);
     printValue(chunk->constants.values[constantIndex]);
     printf("\n");
 
