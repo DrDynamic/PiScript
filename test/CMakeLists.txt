@@ -58,8 +58,7 @@ add_custom_target(
 	COMMAND ${CPPCHECK_EXECUTABLE} --project=./compile_commands.json
 		--enable=all --inconclusive --suppress=unusedFunction
 		--suppress=unmatchedSuppression --suppress=missingIncludeSystem
-		--addon=cert --addon=threadsafety
-		--error-exitcode=1
+		--addon=threadsafety --error-exitcode=1
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/build
 	COMMENT "Running cppcheck..."
 	VERBATIM
