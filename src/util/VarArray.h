@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../common.h"
-#include "object.h"
+#include "../object.h"
 
 
 typedef struct {
@@ -9,6 +9,7 @@ typedef struct {
     ObjString* identifier;
     bool readonly;
     int shadowAddr;
+    bool isCaptured;
 } Var;
 
 typedef struct {

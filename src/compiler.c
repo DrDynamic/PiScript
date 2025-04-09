@@ -40,24 +40,34 @@ typedef struct {
     Precedence precedence;
 } ParseRule;
 
+typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
+
 typedef struct {
-    Table identifiers;
-    VarArray identifierProps;
-    uint32_t identifiersCount;
+    uint8_t index;
+    bool isLocal;
+    Var* varProps;
+} Upvalue;
+
+
+typedef struct Compiler {
+    struct Compiler* enclosing;
+    ObjFunction* function;
+    FunctionType type;
 
     Table localNames;
     VarArray localProps;
+
+    Upvalue upvalues[UINT8_COUNT];
 
     int scopeDepth;
 } Compiler;
 
 Parser parser;
 Compiler* current = NULL;
-Chunk* compilingChunk;
 
 static Chunk* currentChunk()
 {
-    return compilingChunk;
+    return &current->function->chunk;
 }
 
 static void errorAt(Token* token, const char* message)
@@ -127,6 +137,7 @@ static bool match(TokenType type)
     return true;
 }
 
+
 static void emitByte(uint8_t byte)
 {
     writeChunk(currentChunk(), byte, parser.previous.line);
@@ -138,7 +149,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2)
     emitByte(byte1);
     emitByte(byte2);
 }
-    */
+*/
 
 static void emitLoop(int loopStart)
 {
@@ -164,6 +175,7 @@ static int emitJump(uint8_t instruction)
 
 static void emitReturn()
 {
+    emitByte(OP_NIL);
     emitByte(OP_RETURN);
 }
 
@@ -201,40 +213,55 @@ static void patchJump(int offset)
     currentChunk()->code[offset + 1] = jump & 0xFF;
 }
 
-static void initCompiler(Compiler* compiler)
+static void initCompiler(Compiler* compiler, FunctionType type)
 {
-    initTable(&compiler->identifiers);
-    initVarArray(&compiler->identifierProps);
-    compiler->identifiersCount = 0;
+    compiler->enclosing = current;
+    compiler->function = NULL;
+    compiler->type = type;
 
     initTable(&compiler->localNames);
     initVarArray(&compiler->localProps);
 
     compiler->scopeDepth = 0;
+    compiler->function = newFunction();
     current = compiler;
+
+    if (type != TYPE_SCRIPT) {
+        current->function->name = copyString(parser.previous.start, parser.previous.length);
+    }
+
+    writeVarArray(&current->localProps,
+        (Var) {
+            .depth = -1,
+            .identifier = NULL,
+            .shadowAddr = -1,
+            .readonly = true,
+            .isCaptured = false,
+        });
 }
 
 static void freeCompiler(Compiler* compiler)
 {
-    freeTable(&compiler->identifiers);
-    freeVarArray(&compiler->identifierProps);
-
     freeTable(&compiler->localNames);
     freeVarArray(&compiler->localProps);
 
-    initCompiler(compiler);
+    initCompiler(compiler, TYPE_SCRIPT);
 }
 
-static void endCompiler()
+static ObjFunction* endCompiler()
 {
     emitReturn();
+    ObjFunction* function = current->function;
 #ifdef DEBUG_PRINT_CODE
     if (!parser.hadError) {
-        disassembleChunk(currentChunk(), "code");
+        disassembleChunk(
+            currentChunk(), function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
-
-    freeCompiler(current);
+    // TODO: fix memory leak
+    //    freeCompiler(current);
+    current = current->enclosing;
+    return function;
 }
 
 static void beginScope()
@@ -255,11 +282,17 @@ static void endScope()
         } else {
             tableDelete(&current->localNames, local->identifier);
         }
-        emitByte(OP_POP);
+
+        if (current->localProps.values[current->localProps.count - 1].isCaptured) {
+            emitByte(OP_CLOSE_UPVALUE);
+        } else {
+            emitByte(OP_POP);
+        }
         current->localProps.count--;
     }
 }
 
+static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps);
 static void expression();
 static void statement();
 static void declaration();
@@ -269,6 +302,7 @@ static uint32_t identifierConstant(Token* name);
 static int resolveLocal(Compiler* compiler, Token* name);
 static void and_(bool canAssign);
 static void or_(bool canAssign);
+static uint8_t argumentList();
 
 static void binary(bool canAssign)
 {
@@ -311,6 +345,14 @@ static void binary(bool canAssign)
     default:
         return;
     }
+}
+
+static void call(bool canAssign)
+{
+    (void)canAssign;
+    uint8_t argCount = argumentList();
+    emitByte(OP_CALL);
+    emitByte(argCount);
 }
 
 static void literal(bool canAssign)
@@ -381,9 +423,14 @@ static void namedVariable(Token name, bool canAssign)
         getOpLong = OP_GET_LOCAL_LONG;
         setOp = OP_SET_LOCAL;
         setOpLong = OP_SET_LOCAL_LONG;
+    } else if ((addr = resolveUpvalue(current, &name, &var)) != -1) {
+        getOp = OP_GET_UPVALUE;
+        getOpLong = 0xFF; // not supported
+        setOp = OP_SET_UPVALUE;
+        setOpLong = 0xFF; // not supported
     } else {
         addr = identifierConstant(&name);
-        var = &current->identifierProps.values[addr];
+        var = &vm.globalProps.values[addr];
 
         getOp = OP_GET_GLOBAL;
         getOpLong = OP_GET_GLOBAL_LONG;
@@ -430,7 +477,7 @@ static void unary(bool canAssign)
 }
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = { grouping, NULL, PREC_NONE },
+    [TOKEN_LEFT_PAREN] = { grouping, call, PREC_CALL },
     [TOKEN_RIGHT_PAREN] = { NULL, NULL, PREC_NONE },
     [TOKEN_LEFT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_RIGHT_BRACE] = { NULL, NULL, PREC_NONE },
@@ -500,13 +547,13 @@ static uint32_t identifierConstant(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&current->identifiers, identifier, &addr)) {
+    if (tableGetUint32(&vm.globalAddresses, identifier, &addr)) {
         return addr;
     }
 
-    addr = current->identifiersCount++;
-    tableSetUint32(&current->identifiers, identifier, addr);
-    writeVarArray(&current->identifierProps, (Var) { .identifier = identifier, .readonly = false });
+    addr = vm.globalCount++;
+    tableSetUint32(&vm.globalAddresses, identifier, addr);
+    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = false });
 
     return addr;
 }
@@ -524,6 +571,49 @@ static int resolveLocal(Compiler* compiler, Token* name)
     return -1;
 }
 
+static int addUpvalue(Compiler* compiler, uint32_t index, bool isLocal, Var* varProps)
+{
+    int upvalueCount = compiler->function->upvalueCount;
+
+    for (int i = 0; i < upvalueCount; i++) {
+        Upvalue* upvalue = &compiler->upvalues[i];
+        if (upvalue->index == index && upvalue->isLocal == isLocal) {
+            return i;
+        }
+    }
+
+    if (upvalueCount == UINT8_COUNT) {
+        error("Too many closure variables in function.");
+        return 0;
+    }
+
+    compiler->upvalues[upvalueCount].isLocal = isLocal;
+    compiler->upvalues[upvalueCount].index = index;
+    compiler->upvalues[upvalueCount].varProps = varProps;
+    return compiler->function->upvalueCount++;
+}
+
+static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps)
+{
+    if (compiler->enclosing == NULL) {
+        return -1;
+    }
+
+    int local = resolveLocal(compiler->enclosing, name);
+    if (local != -1) {
+        compiler->enclosing->localProps.values[local].isCaptured = true;
+        *varProps = &compiler->localProps.values[local];
+        return addUpvalue(compiler, (uint32_t)local, true, *varProps);
+    }
+
+    int upvalue = resolveUpvalue(compiler->enclosing, name, varProps);
+    if (upvalue != -1) {
+        return addUpvalue(compiler, upvalue, false, *varProps);
+    }
+
+    return -1;
+}
+
 static uint32_t addLocal(Token name)
 {
     ObjString* identifier = copyString(name.start, name.length);
@@ -533,12 +623,24 @@ static uint32_t addLocal(Token name)
 
         tableSetUint32(&current->localNames, identifier, current->localProps.count);
         writeVarArray(&current->localProps,
-            (Var) { .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = addr });
+            (Var) {
+                .identifier = identifier,
+                .depth = -1,
+                .readonly = false,
+                .shadowAddr = addr,
+                .isCaptured = false,
+            });
 
     } else {
         tableSetUint32(&current->localNames, identifier, current->localProps.count);
         writeVarArray(&current->localProps,
-            (Var) { .identifier = identifier, .depth = -1, .readonly = false, .shadowAddr = -1 });
+            (Var) {
+                .identifier = identifier,
+                .depth = -1,
+                .readonly = false,
+                .shadowAddr = -1,
+                .isCaptured = false,
+            });
         addr = current->localProps.count - 1;
     }
 
@@ -569,7 +671,6 @@ static uint32_t parseVariable(const char* errorMessage)
 
     uint32_t localAddr = declareVariable();
     if (current->scopeDepth > 0) {
-
         return localAddr;
     }
 
@@ -578,6 +679,9 @@ static uint32_t parseVariable(const char* errorMessage)
 
 static void markInitialized()
 {
+    if (current->scopeDepth == 0) {
+        return;
+    }
     current->localProps.values[current->localProps.count - 1].depth = current->scopeDepth;
 }
 
@@ -588,8 +692,26 @@ static void defineVariable(uint32_t addr, bool readonly)
         current->localProps.values[addr].readonly = readonly;
         return;
     }
-    current->identifierProps.values[addr].readonly = readonly;
+
+    vm.globalProps.values[addr].readonly = readonly;
     emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
+}
+
+
+static uint8_t argumentList()
+{
+    uint8_t argCount = 0;
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            expression();
+            if (argCount == 255) {
+                error("Can't have more than 255 arguments.");
+            }
+            argCount++;
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+    return argCount;
 }
 
 static void and_(bool canAssign)
@@ -620,6 +742,45 @@ static void block()
     }
 
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+}
+
+static void function(FunctionType type)
+{
+    Compiler compiler;
+    initCompiler(&compiler, type);
+    beginScope();
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            current->function->arity++;
+            if (current->function->arity > 255) {
+                errorAtCurrent("Can't have more than 255 parameters.");
+            }
+            uint8_t constant = parseVariable("Expect parameter name");
+            defineVariable(constant, false);
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    block();
+
+    ObjFunction* function = endCompiler();
+    emitConstant(
+        makeConstant(OBJ_VAL(function)), parser.previous.line, OP_CLOSURE, OP_CLOSURE_LONG);
+
+    for (int i = 0; i < function->upvalueCount; i++) {
+        emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+        emitByte(compiler.upvalues[i].index);
+    }
+}
+
+static void funDeclaration()
+{
+    uint8_t addr = parseVariable("Expect function name.");
+    markInitialized();
+    function(TYPE_FUNCTION);
+    defineVariable(addr, true);
 }
 
 static void varDeclaration(bool readonly)
@@ -720,6 +881,21 @@ static void printStatement()
     emitByte(OP_PRINT);
 }
 
+static void returnStatement()
+{
+    if (current->type == TYPE_SCRIPT) {
+        error("Can't return from top-level code.");
+    }
+
+    if (match(TOKEN_SEMICOLON)) {
+        emitReturn();
+    } else {
+        expression();
+        consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
+        emitByte(OP_RETURN);
+    }
+}
+
 static void whileStatement()
 {
     int loopStart = currentChunk()->count;
@@ -765,7 +941,9 @@ static void synchronize()
 
 static void declaration()
 {
-    if (match(TOKEN_VAR)) {
+    if (match(TOKEN_FUN)) {
+        funDeclaration();
+    } else if (match(TOKEN_VAR)) {
         varDeclaration(false);
     } else if (match(TOKEN_CONST)) {
         varDeclaration(true);
@@ -785,6 +963,8 @@ static void statement()
         forStatement();
     } else if (match(TOKEN_IF)) {
         ifStatement();
+    } else if (match(TOKEN_RETURN)) {
+        returnStatement();
     } else if (match(TOKEN_WHILE)) {
         whileStatement();
     } else if (match(TOKEN_LEFT_BRACE)) {
@@ -796,13 +976,22 @@ static void statement()
     }
 }
 
-bool compile(const char* source, Chunk* chunk)
+void defineNative(const char* name, NativeFn function)
+{
+    ObjString* identifier = copyString(name, (int)strlen(name));
+    ObjNative* native = newNative(function);
+
+    uint32_t addr = vm.globalCount++;
+    tableSetUint32(&vm.globalAddresses, identifier, addr);
+    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = true });
+    writeValueArray(&vm.globals, OBJ_VAL(native));
+}
+
+ObjFunction* compile(const char* source)
 {
     initScanner(source);
     Compiler compiler;
-    initCompiler(&compiler);
-    compilingChunk = chunk;
-
+    initCompiler(&compiler, TYPE_SCRIPT);
 
     parser.hadError = false;
     parser.panicMode = false;
@@ -813,6 +1002,6 @@ bool compile(const char* source, Chunk* chunk)
         declaration();
     }
 
-    endCompiler();
-    return !parser.hadError;
+    ObjFunction* function = endCompiler();
+    return parser.hadError ? NULL : function;
 }

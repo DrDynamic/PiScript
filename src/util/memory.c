@@ -27,6 +27,26 @@ static void freeObject(Obj* object)
         FREE(ObjString, object);
         break;
     }
+    case OBJ_CLOSURE: {
+        ObjClosure* closure = (ObjClosure*)object;
+        FREE_ARRAY(ObjClosure*, closure->upvalues, closure->upvalueCount);
+        FREE(ObjClosure, object);
+        break;
+    }
+    case OBJ_FUNCTION: {
+        ObjFunction* function = (ObjFunction*)object;
+        freeChunk(&function->chunk);
+        FREE(ObjFunction, object);
+        break;
+    }
+    case OBJ_NATIVE: {
+        FREE(ObjNative, object);
+        break;
+    }
+    case OBJ_UPVALUE: {
+        FREE(ObjUpvalue, object);
+        break;
+    }
     default:
         printf("FATAL: could not free object of type %d (no implementation)", object->type);
         break;

@@ -4,4 +4,5 @@
 #include "object.h"
 #include "vm.h"
 
-bool compile(const char* source, Chunk* chunk);
+void defineNative(const char* name, NativeFn function);
+ObjFunction* compile(const char* source);
