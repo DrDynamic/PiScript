@@ -29,10 +29,11 @@
  *
  * @param state unused
  */
-static void reallocate_allocates_memory(void **state) {
+static void reallocate_allocates_memory(void** state)
+{
     (void)state;
 
-    void *data = NULL;
+    void* data = NULL;
 
     expect_value(__wrap_realloc, mem_address, data);
     expect_value(__wrap_realloc, size, 8);
@@ -46,10 +47,11 @@ static void reallocate_allocates_memory(void **state) {
  *
  * @param state unused
  */
-static void reallocate_reallocates_memory(void **state) {
+static void reallocate_reallocates_memory(void** state)
+{
     (void)state;
 
-    void *data = NULL;
+    void* data = NULL;
 
     expect_value(__wrap_realloc, mem_address, data);
     expect_value(__wrap_realloc, size, 16);
@@ -62,11 +64,13 @@ static void reallocate_reallocates_memory(void **state) {
  *
  * @param state unused
  */
-static void reallocate_frees_memory(void **state) {
+static void reallocate_frees_memory(void** state)
+{
     (void)state;
 
-    void *data = malloc(8);
+    void* data = malloc(8);
     data = reallocate(data, 8, 0);
+    (void)data;
 }
 
 /**
@@ -74,7 +78,8 @@ static void reallocate_frees_memory(void **state) {
  *
  * @param state unused
  */
-static void GROW_CAPACITY_has_minimum_capacity(void **state) {
+static void GROW_CAPACITY_has_minimum_capacity(void** state)
+{
     (void)state;
 
     assert_int_equal(GROW_CAPACITY(0), 8);
@@ -87,7 +92,8 @@ static void GROW_CAPACITY_has_minimum_capacity(void **state) {
  *
  * @param state unused
  */
-static void GROW_CAPACITY_doubles_capacity(void **state) {
+static void GROW_CAPACITY_doubles_capacity(void** state)
+{
     (void)state;
 
     assert_int_equal(GROW_CAPACITY(8), 16);
@@ -100,10 +106,11 @@ static void GROW_CAPACITY_doubles_capacity(void **state) {
  *
  * @param state unused
  */
-static void GROW_ARRAY_reallocates_memory(void **state) {
+static void GROW_ARRAY_reallocates_memory(void** state)
+{
     (void)state;
 
-    uint8_t *data = NULL;
+    uint8_t* data = NULL;
 
     expect_value(__wrap_realloc, mem_address, data);
     expect_value(__wrap_realloc, size, 8);
@@ -115,6 +122,7 @@ static void GROW_ARRAY_reallocates_memory(void **state) {
 
     // no realloc -> calls free()
     data = GROW_ARRAY(uint8_t, data, 16, 0);
+    (void)data;
 }
 
 /**
@@ -122,10 +130,11 @@ static void GROW_ARRAY_reallocates_memory(void **state) {
  *
  * @param state unused
  */
-static void FREE_ARRAY_frees_memory(void **state) {
+static void FREE_ARRAY_frees_memory(void** state)
+{
     (void)state;
 
-    uint8_t *data = malloc(8);
+    uint8_t* data = malloc(8);
     (void)data;
     FREE_ARRAY(uint8_t, data, 8);
 }
@@ -140,7 +149,8 @@ static void FREE_ARRAY_frees_memory(void **state) {
  *
  * @return int count of failed tests
  */
-int main(void) {
+int main(void)
+{
     const struct CMUnitTest tests_memory[] = {
         cmocka_unit_test(reallocate_allocates_memory),
         cmocka_unit_test(reallocate_reallocates_memory),

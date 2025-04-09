@@ -77,7 +77,7 @@ static int closureInstruction(const char* name, uint32_t constantIndex, Chunk* c
     printValue(chunk->constants.values[constantIndex]);
     printf("\n");
 
-    ObjFunction* function = AS_FUNCTION(chunk->constants.values[constantIndex]);
+    const ObjFunction* function = AS_FUNCTION(chunk->constants.values[constantIndex]);
     for (int j = 0; j < function->upvalueCount; j++) {
         int isLocal = chunk->code[offset++];
         int index = chunk->code[offset++];
