@@ -5,10 +5,13 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: nikolodion/cmake-tdd:latest
+    container: ubuntu:oracular
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: Setup
+      run: apt-get -q -y update && apt-get -q -y install git gcc cmake cppcheck libcmocka-dev
 
     - name: Configure
       # Configure CMake in a 'build' subdirectory.
@@ -24,19 +27,6 @@ jobs:
       working-directory: ${{github.workspace}}/build
       run: make tests
 
-    - name: Doc
-      # Generate documentation with doxygen.
-      working-directory: ${{github.workspace}}/build
-      run: make doc
-
     - name: Rsync
       if: ${{ github.ref == 'refs/heads/main' }} && ${{ github.event_name == 'push' }}
       run: apt-get update && apt-get install -y rsync
-
-    - name: Pages
-      # Publish doxygen documentation (only on main)
-      if: ${{ github.ref == 'refs/heads/main' }} && ${{ github.event_name == 'push' }}
-      uses: JamesIves/github-pages-deploy-action@4.1.4
-      with:
-        branch: pages
-        folder: ${{github.workspace}}/build/doc/html

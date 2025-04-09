@@ -29,7 +29,7 @@ static void runtimeError(const char* format, ...)
 
     for (int i = vm.frameCount - 1; i >= 0; i--) {
         CallFrame* frame = &vm.frames[i];
-        ObjFunction* function = frame->closure->function;
+        const ObjFunction* function = frame->closure->function;
         size_t instruction = frame->ip - frame->closure->function->chunk.code - 1;
         int line
             = getSourceInfoLinenumber(&frame->closure->function->chunk.sourceinfo, instruction);
@@ -143,8 +143,8 @@ static bool isFalsey(Value value)
 
 static void concatinate()
 {
-    ObjString* b = AS_STRING(pop());
-    ObjString* a = AS_STRING(pop());
+    const ObjString* b = AS_STRING(pop());
+    const ObjString* a = AS_STRING(pop());
 
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);

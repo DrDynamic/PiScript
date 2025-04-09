@@ -1002,6 +1002,6 @@ ObjFunction* compile(const char* source)
         declaration();
     }
 
-    ObjFunction* function = endCompiler();
-    return parser.hadError ? NULL : function;
+    ObjFunction* scriptFunction = endCompiler();
+    return parser.hadError ? NULL : scriptFunction;
 }

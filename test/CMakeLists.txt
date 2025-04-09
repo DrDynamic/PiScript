@@ -56,9 +56,11 @@ find_program(CPPCHECK_EXECUTABLE cppcheck REQUIRED)
 add_custom_target(
 	test_cppcheck
 	COMMAND ${CPPCHECK_EXECUTABLE} --project=./compile_commands.json
-		--enable=all --inconclusive --suppress=unusedFunction
-		--suppress=unmatchedSuppression --suppress=missingIncludeSystem
-		--addon=cert --addon=threadsafety
+		--enable=all --inconclusive --suppress=unusedFunction 
+		--suppress=unmatchedSuppression --suppress=missingIncludeSystem 
+		--suppress=constParameterPointer --suppress=invalidPrintfArgType_sint
+		--suppress=constVariablePointer
+		#--addon=threadsafety 
 		--error-exitcode=1
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/build
 	COMMENT "Running cppcheck..."

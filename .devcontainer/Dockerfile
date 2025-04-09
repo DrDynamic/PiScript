@@ -7,8 +7,6 @@ RUN apt-get -q -y update && apt-get -q -y install \
     gcc \
     gdb \
     cmake \
-    doxygen \
-    graphviz \
     cppcheck \
     libcmocka-dev
 
