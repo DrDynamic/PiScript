@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #include "chunk.h"
-#include "util/memory.h"
+#include "../util/memory.h"
 
 void initChunk(Chunk* chunk)
 {

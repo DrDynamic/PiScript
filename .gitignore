@@ -1,3 +1,5 @@
 /build/
 /tool/.dart_tool/
 /tool/.packages
+/zig-out
+/.zig-cache

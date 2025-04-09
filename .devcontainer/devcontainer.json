@@ -12,6 +12,7 @@
 		"ms-vscode.cpptools",
 		"twxs.cmake",
 		"cschlosser.doxdocgen",
-		"spmeesseman.vscode-taskexplorer"
+		"spmeesseman.vscode-taskexplorer",
+		"ziglang.vscode-zig"
 	]
 }

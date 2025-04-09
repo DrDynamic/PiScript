@@ -17,6 +17,7 @@
         "scanner.h": "c",
         "debug.h": "c",
         "object.h": "c",
-        "integerarray.h": "c"
+        "integerarray.h": "c",
+        "vararray.h": "c"
     }
 }
