@@ -50,6 +50,13 @@ void printValue(Value value)
     }
 }
 
+void markValueArray(ValueArray* array)
+{
+    for (unsigned int i = 0; i < array->count; i++) {
+        markValue(array->values[i]);
+    }
+}
+
 bool valuesEqual(Value a, Value b)
 {
     if (a.type != b.type)

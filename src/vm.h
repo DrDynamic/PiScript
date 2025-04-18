@@ -23,13 +23,14 @@ typedef struct {
     Value* stackTop;
     ValueArray globals;
 
-    Table globalAddresses;
-    VarArray globalProps;
-    uint32_t globalCount;
-
     Table strings;
     ObjUpvalue* openUpvalues;
     Obj* objects;
+
+    // used by compiler
+    Table globalAddresses;
+    VarArray globalProps;
+    uint32_t globalCount;
 } VM;
 
 
