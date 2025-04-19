@@ -160,6 +160,11 @@ void initVM()
 {
     resetStack();
     vm.objects = NULL;
+
+    vm.grayCapacity = 0;
+    vm.grayCount = 0;
+    vm.grayStack = NULL;
+
     initValueArray(&vm.globals);
     initTable(&vm.strings);
 
@@ -179,6 +184,8 @@ void freeVM()
     freeTable(&vm.globalAddresses);
     freeVarArray(&vm.globalProps);
     vm.globalCount = 0;
+
+    free(vm.grayStack);
 }
 
 static inline bool checkGlobalDefined(uint32_t addr)

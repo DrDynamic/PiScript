@@ -31,6 +31,11 @@ typedef struct {
     Table globalAddresses;
     VarArray globalProps;
     uint32_t globalCount;
+
+    // garbage collection
+    int grayCount;
+    int grayCapacity;
+    Obj** grayStack;
 } VM;
 
 
