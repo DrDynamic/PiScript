@@ -6,7 +6,8 @@
 #include "../compiler.h"
 #include "../value.h"
 
-#ifdef DEBUG_LOG_GC
+#if defined(DEBUG_LOG_GC_MARK) || defined(DEBUG_LOG_GC_BLACKEN) || defined(DEBUG_LOG_GC_SWEEP)     \
+    || defined(DEBUG_LOG_GC_FREE)
 #include <stdio.h>
 #include "debug.h"
 #endif
@@ -39,8 +40,10 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize)
 
 static void freeObject(Obj* object)
 {
-#ifdef DEBUG_LOG_GC
-    printf("%p free type %d\n", (void*)object, object->type);
+#ifdef DEBUG_LOG_GC_FREE
+    printf("%p free type %d - '", (void*)object, object->type);
+    printValue(OBJ_VAL(object));
+    printf("'\n");
 #endif
     switch (object->type) {
     case OBJ_STRING: {
@@ -97,7 +100,7 @@ void markObject(Obj* object)
         return;
     }
 
-#ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_GC_MARK
     printf("%p mark ", (void*)object);
     printValue(OBJ_VAL(object));
     printf("\n");
@@ -123,7 +126,7 @@ void markValue(Value value)
 
 static void blackenObject(Obj* object)
 {
-#ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_GC_BLACKEN
     printf("%p blacken ", (void*)object);
     printValue(OBJ_VAL(object));
     printf("\n");
@@ -208,6 +211,11 @@ static void sweep()
                 vm.objects = object;
             }
 
+#ifdef DEBUG_LOG_GC_SWEEP
+            printf("%p sweep '", (void*)unreached);
+            printValue(OBJ_VAL(unreached));
+            printf("'\n");
+#endif
             freeObject(unreached);
         }
     }

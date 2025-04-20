@@ -618,6 +618,7 @@ static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps)
 static uint32_t addLocal(Token name)
 {
     ObjString* identifier = copyString(name.start, name.length);
+    push(OBJ_VAL(identifier));
 
     uint32_t addr;
     if (tableGetUint32(&current->localNames, identifier, &addr)) {
@@ -644,7 +645,7 @@ static uint32_t addLocal(Token name)
             });
         addr = current->localProps.count - 1;
     }
-
+    pop(); // identifier
     return addr;
 }
 
@@ -980,12 +981,17 @@ static void statement()
 void defineNative(const char* name, NativeFn function)
 {
     ObjString* identifier = copyString(name, (int)strlen(name));
+    push(OBJ_VAL(identifier));
     ObjNative* native = newNative(function);
+    push(OBJ_VAL(native));
 
     uint32_t addr = vm.globalCount++;
     tableSetUint32(&vm.globalAddresses, identifier, addr);
     writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = true });
     writeValueArray(&vm.globals, OBJ_VAL(native));
+
+    pop();
+    pop();
 }
 
 ObjFunction* compile(const char* source)
@@ -1012,6 +1018,7 @@ void markCompilerRoots()
     Compiler* compiler = current;
     while (compiler != NULL) {
         markObject((Obj*)compiler->function);
+        markTable(&compiler->localNames);
         compiler = compiler->enclosing;
     }
 }

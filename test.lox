@@ -1,3 +1,5 @@
+clock();
+collectGarbage();
 var b = "LOREM"
 
 fun makeClosure(prefix) {
