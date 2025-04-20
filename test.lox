@@ -1,16 +1,13 @@
-fun outer() {
-  var x = "outside";
-  fun inner() {
-    print x;
-  }
-  return inner;
+var b = "LOREM"
+
+fun makeClosure(prefix) {
+  var a = "data";
+
+  fun f() { print prefix + " " + a; }
+  return f;
 }
 
-var inner = outer();
 {
-var a = "bli";
-var b = "blip";
+  var closure = makeClosure("HELLO");
+  closure();
 }
-
-
-inner();

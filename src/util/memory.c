@@ -11,12 +11,19 @@
 #include "debug.h"
 #endif
 
+// TODO: finetine garbage collection
+#define GC_HEAP_GROW_FACTOR 2
+
 void* reallocate(void* pointer, size_t oldSize, size_t newSize)
 {
+    vm.bytesAllocated += newSize - oldSize;
     if (newSize > oldSize) {
 #ifdef DEBUG_STRESS_GC
         collectGarbage();
 #endif
+        if (vm.bytesAllocated > vm.nextGC) {
+            collectGarbage();
+        }
     }
 
     if (newSize == 0) {
@@ -76,6 +83,8 @@ void freeObjects()
         freeObject(object);
         object = next;
     }
+
+    free(vm.grayStack);
 }
 
 void markObject(Obj* object)
@@ -120,18 +129,20 @@ static void blackenObject(Obj* object)
     printf("\n");
 #endif
     switch (object->type) {
-    case OBJ_CLOSURE:
+    case OBJ_CLOSURE: {
         ObjClosure* closure = (ObjClosure*)object;
-        markObject(closure->function);
+        markObject((Obj*)closure->function);
         for (int i = 0; i < closure->upvalueCount; i++) {
             markObject((Obj*)closure->upvalues[i]);
         }
         break;
-    case OBJ_FUNCTION:
+    }
+    case OBJ_FUNCTION: {
         ObjFunction* function = (ObjFunction*)object;
         markObject((Obj*)function->name);
         markValueArray(&function->chunk.constants);
         break;
+    }
     case OBJ_UPVALUE:
         markValue(((ObjUpvalue*)object)->closed);
         break;
@@ -197,7 +208,7 @@ static void sweep()
                 vm.objects = object;
             }
 
-            freeObject(object);
+            freeObject(unreached);
         }
     }
 }
@@ -206,6 +217,7 @@ void collectGarbage()
 {
 #ifdef DEBUG_LOG_GC
     printf("-- gc begin\n");
+    size_t before = vm.bytesAllocated;
 #endif
 
     markRoots();
@@ -213,7 +225,11 @@ void collectGarbage()
     tableRemoveWhite(&vm.strings);
     sweep();
 
+    vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;
+
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
+    printf("   collected %zu bytes (from %zu to %zu) next at %zu\n", before - vm.bytesAllocated,
+        before, vm.bytesAllocated, vm.nextGC);
 #endif
 }

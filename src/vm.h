@@ -33,6 +33,8 @@ typedef struct {
     uint32_t globalCount;
 
     // garbage collection
+    size_t bytesAllocated;
+    size_t nextGC;
     int grayCount;
     int grayCapacity;
     Obj** grayStack;

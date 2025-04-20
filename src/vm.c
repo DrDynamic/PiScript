@@ -143,8 +143,8 @@ static bool isFalsey(Value value)
 
 static void concatinate()
 {
-    const ObjString* b = AS_STRING(pop());
-    const ObjString* a = AS_STRING(pop());
+    const ObjString* b = AS_STRING(peek(0));
+    const ObjString* a = AS_STRING(peek(1));
 
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
@@ -153,6 +153,10 @@ static void concatinate()
     chars[length] = '\0';
 
     ObjString* result = takeString(chars, length);
+
+    pop();
+    pop();
+
     push(OBJ_VAL(result));
 }
 
@@ -161,6 +165,8 @@ void initVM()
     resetStack();
     vm.objects = NULL;
 
+    vm.bytesAllocated = 0;
+    vm.nextGC = 1024 * 1024;
     vm.grayCapacity = 0;
     vm.grayCount = 0;
     vm.grayStack = NULL;
@@ -184,8 +190,6 @@ void freeVM()
     freeTable(&vm.globalAddresses);
     freeVarArray(&vm.globalProps);
     vm.globalCount = 0;
-
-    free(vm.grayStack);
 }
 
 static inline bool checkGlobalDefined(uint32_t addr)
