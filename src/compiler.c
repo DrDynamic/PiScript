@@ -777,6 +777,19 @@ static void function(FunctionType type)
     }
 }
 
+static void classDeclaration()
+{
+    uint32_t varAddr = parseVariable("Expect class name.");
+    uint32_t nameAddr
+        = makeConstant(OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
+
+    emitConstant(nameAddr, parser.previous.line, OP_CLASS, OP_CLASS_LONG);
+
+    defineVariable(varAddr, true);
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+}
+
 static void funDeclaration()
 {
     uint8_t addr = parseVariable("Expect function name.");
@@ -943,7 +956,9 @@ static void synchronize()
 
 static void declaration()
 {
-    if (match(TOKEN_FUN)) {
+    if (match(TOKEN_CLASS)) {
+        classDeclaration();
+    } else if (match(TOKEN_FUN)) {
         funDeclaration();
     } else if (match(TOKEN_VAR)) {
         varDeclaration(false);

@@ -297,6 +297,16 @@ static InterpretResult run()
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_CLASS: {
+            uint32_t addr = READ_BYTE();
+            push(OBJ_VAL(newClass(GET_STRING(addr))));
+            break;
+        }
+        case OP_CLASS_LONG: {
+            uint32_t addr = READ_UINT24();
+            push(OBJ_VAL(newClass(GET_STRING(addr))));
+            break;
+        }
         case OP_CLOSURE: {
             uint8_t addr = READ_BYTE();
             Value constant = GET_CONSTANT(addr);

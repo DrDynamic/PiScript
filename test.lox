@@ -1,15 +1,2 @@
-clock();
-collectGarbage();
-var b = "LOREM"
-
-fun makeClosure(prefix) {
-  var a = "data";
-
-  fun f() { print prefix + " " + a; }
-  return f;
-}
-
-{
-  var closure = makeClosure("HELLO");
-  closure();
-}
+class Brioche {}
+print Brioche;

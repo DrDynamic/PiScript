@@ -52,6 +52,10 @@ static void freeObject(Obj* object)
         FREE(ObjString, object);
         break;
     }
+    case OBJ_CLASS: {
+        FREE(ObjClass, object);
+        break;
+    }
     case OBJ_CLOSURE: {
         ObjClosure* closure = (ObjClosure*)object;
         FREE_ARRAY(ObjClosure*, closure->upvalues, closure->upvalueCount);
@@ -132,6 +136,11 @@ static void blackenObject(Obj* object)
     printf("\n");
 #endif
     switch (object->type) {
+    case OBJ_CLASS: {
+        ObjClass* klass = (ObjClass*)object;
+        markObject((Obj*)klass->name);
+        break;
+    }
     case OBJ_CLOSURE: {
         ObjClosure* closure = (ObjClosure*)object;
         markObject((Obj*)closure->function);
@@ -153,11 +162,6 @@ static void blackenObject(Obj* object)
     // -> can go straight from white to black (they have no refereces)
     case OBJ_NATIVE:
     case OBJ_STRING:
-        break;
-
-    default:
-        // TODO: throw error when implementation is missing? (or let compiler handle this with
-        // missing case)
         break;
     }
 }
