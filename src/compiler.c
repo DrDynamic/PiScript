@@ -780,6 +780,7 @@ static void function(FunctionType type)
 static void classDeclaration()
 {
     uint32_t varAddr = parseVariable("Expect class name.");
+    // TODO: remove name from class declaration?
     uint32_t nameAddr
         = makeConstant(OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
 
