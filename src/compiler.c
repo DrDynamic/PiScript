@@ -6,6 +6,7 @@
 #include "compiler.h"
 #include "scanner.h"
 #include "util/VarArray.h"
+#include "util/memory.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -299,6 +300,7 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 static uint32_t identifierConstant(Token* name);
+static uint32_t firstOrMakeGlobal(Token* name);
 static int resolveLocal(Compiler* compiler, Token* name);
 static void and_(bool canAssign);
 static void or_(bool canAssign);
@@ -353,6 +355,19 @@ static void call(bool canAssign)
     uint8_t argCount = argumentList();
     emitByte(OP_CALL);
     emitByte(argCount);
+}
+
+static void dot(bool canAssign)
+{
+    consume(TOKEN_IDENTIFIER, "Expect property after '.'.");
+    uint32_t addr = identifierConstant(&parser.previous);
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        emitConstant(addr, parser.previous.line, OP_SET_PROPERTY, OP_SET_PROPERTY_LONG);
+    } else {
+        emitConstant(addr, parser.previous.line, OP_GET_PROPERTY, OP_GET_PROPERTY_LONG);
+    }
 }
 
 static void literal(bool canAssign)
@@ -429,7 +444,7 @@ static void namedVariable(Token name, bool canAssign)
         setOp = OP_SET_UPVALUE;
         setOpLong = 0xFF; // not supported
     } else {
-        addr = identifierConstant(&name);
+        addr = firstOrMakeGlobal(&name);
         var = &vm.globalProps.values[addr];
 
         getOp = OP_GET_GLOBAL;
@@ -482,7 +497,7 @@ ParseRule rules[] = {
     [TOKEN_LEFT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_RIGHT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_COMMA] = { NULL, NULL, PREC_NONE },
-    [TOKEN_DOT] = { NULL, NULL, PREC_NONE },
+    [TOKEN_DOT] = { NULL, dot, PREC_CALL },
     [TOKEN_MINUS] = { unary, binary, PREC_TERM },
     [TOKEN_PLUS] = { NULL, binary, PREC_TERM },
     [TOKEN_SEMICOLON] = { NULL, NULL, PREC_NONE },
@@ -544,6 +559,12 @@ static void parsePrecedence(Precedence precedence)
 }
 
 static uint32_t identifierConstant(Token* name)
+{
+    ObjString* identifier = copyString(name->start, name->length);
+    return makeConstant(OBJ_VAL(identifier));
+}
+
+static uint32_t firstOrMakeGlobal(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
@@ -617,6 +638,7 @@ static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps)
 static uint32_t addLocal(Token name)
 {
     ObjString* identifier = copyString(name.start, name.length);
+    push(OBJ_VAL(identifier));
 
     uint32_t addr;
     if (tableGetUint32(&current->localNames, identifier, &addr)) {
@@ -643,7 +665,7 @@ static uint32_t addLocal(Token name)
             });
         addr = current->localProps.count - 1;
     }
-
+    pop(); // identifier
     return addr;
 }
 
@@ -674,7 +696,7 @@ static uint32_t parseVariable(const char* errorMessage)
         return localAddr;
     }
 
-    return identifierConstant(&parser.previous);
+    return firstOrMakeGlobal(&parser.previous);
 }
 
 static void markInitialized()
@@ -773,6 +795,20 @@ static void function(FunctionType type)
         emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
         emitByte(compiler.upvalues[i].index);
     }
+}
+
+static void classDeclaration()
+{
+    uint32_t varAddr = parseVariable("Expect class name.");
+    // TODO: remove name from class declaration?
+    uint32_t nameAddr
+        = makeConstant(OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
+
+    emitConstant(nameAddr, parser.previous.line, OP_CLASS, OP_CLASS_LONG);
+
+    defineVariable(varAddr, true);
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 }
 
 static void funDeclaration()
@@ -941,7 +977,9 @@ static void synchronize()
 
 static void declaration()
 {
-    if (match(TOKEN_FUN)) {
+    if (match(TOKEN_CLASS)) {
+        classDeclaration();
+    } else if (match(TOKEN_FUN)) {
         funDeclaration();
     } else if (match(TOKEN_VAR)) {
         varDeclaration(false);
@@ -979,12 +1017,17 @@ static void statement()
 void defineNative(const char* name, NativeFn function)
 {
     ObjString* identifier = copyString(name, (int)strlen(name));
+    push(OBJ_VAL(identifier));
     ObjNative* native = newNative(function);
+    push(OBJ_VAL(native));
 
     uint32_t addr = vm.globalCount++;
     tableSetUint32(&vm.globalAddresses, identifier, addr);
     writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = true });
     writeValueArray(&vm.globals, OBJ_VAL(native));
+
+    pop();
+    pop();
 }
 
 ObjFunction* compile(const char* source)
@@ -1004,4 +1047,14 @@ ObjFunction* compile(const char* source)
 
     ObjFunction* scriptFunction = endCompiler();
     return parser.hadError ? NULL : scriptFunction;
+}
+
+void markCompilerRoots()
+{
+    Compiler* compiler = current;
+    while (compiler != NULL) {
+        markObject((Obj*)compiler->function);
+        markTable(&compiler->localNames);
+        compiler = compiler->enclosing;
+    }
 }

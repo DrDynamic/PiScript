@@ -46,3 +46,9 @@ void printVarArray(VarArray* array, const char* title, ...)
 
     printf("============\n");
 }
+void markVarArray(VarArray* array)
+{
+    for (unsigned int i = 0; i < array->count; i++) {
+        markObject((Obj*)array->values[i].identifier);
+    }
+}

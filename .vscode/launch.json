@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/src/pit",
             "args": [
-                "../language-tests/regression/40.lox"
+                "../test.lox"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

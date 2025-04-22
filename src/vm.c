@@ -6,7 +6,7 @@
 #include "vm.h"
 #include "compiler.h"
 #include "debug.h"
-#include "object.h"
+// #include "object.h"
 #include "memory.h"
 #include "natives.h"
 
@@ -85,6 +85,11 @@ static bool callValue(Value callee, int argCount)
 {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+        case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(callee);
+            vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+            return true;
+        }
         case OBJ_CLOSURE:
             return call(AS_CLOSURE(callee), argCount);
         case OBJ_NATIVE: {
@@ -143,8 +148,8 @@ static bool isFalsey(Value value)
 
 static void concatinate()
 {
-    const ObjString* b = AS_STRING(pop());
-    const ObjString* a = AS_STRING(pop());
+    const ObjString* b = AS_STRING(peek(0));
+    const ObjString* a = AS_STRING(peek(1));
 
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
@@ -153,6 +158,10 @@ static void concatinate()
     chars[length] = '\0';
 
     ObjString* result = takeString(chars, length);
+
+    pop();
+    pop();
+
     push(OBJ_VAL(result));
 }
 
@@ -160,6 +169,13 @@ void initVM()
 {
     resetStack();
     vm.objects = NULL;
+
+    vm.bytesAllocated = 0;
+    vm.nextGC = 1024 * 1024;
+    vm.grayCapacity = 0;
+    vm.grayCount = 0;
+    vm.grayStack = NULL;
+
     initValueArray(&vm.globals);
     initTable(&vm.strings);
 
@@ -185,6 +201,42 @@ static inline bool checkGlobalDefined(uint32_t addr)
 {
     return addr >= vm.globals.count
         || (IS_OBJ(vm.globals.values[addr]) && vm.globals.values[addr].as.obj == NULL);
+}
+
+static inline bool getProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
+{
+    if (!IS_INSTANCE(instanceValue)) {
+        runtimeError("Only instances value properties.");
+        return false;
+    }
+    ObjInstance* instance = AS_INSTANCE(instanceValue);
+    ObjString* name = AS_STRING(frame->closure->function->chunk.constants.values[propertyAddr]);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        pop();
+        push(value);
+        return true;
+    }
+
+    runtimeError("Undefined property '%s'.", name->chars);
+    return false;
+}
+
+static inline bool setProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
+{
+    if (!IS_INSTANCE(instanceValue)) {
+        runtimeError("Only instances have fields.");
+        return false;
+    }
+    ObjString* propName = AS_STRING(frame->closure->function->chunk.constants.values[propertyAddr]);
+
+    ObjInstance* instance = AS_INSTANCE(instanceValue);
+    tableSet(&instance->fields, propName, peek(0));
+    Value value = pop();
+    pop();
+    push(value);
+    return true;
 }
 
 static InterpretResult run()
@@ -284,6 +336,16 @@ static InterpretResult run()
                 return INTERPRET_RUNTIME_ERROR;
             }
             frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_CLASS: {
+            uint32_t addr = READ_BYTE();
+            push(OBJ_VAL(newClass(GET_STRING(addr))));
+            break;
+        }
+        case OP_CLASS_LONG: {
+            uint32_t addr = READ_UINT24();
+            push(OBJ_VAL(newClass(GET_STRING(addr))));
             break;
         }
         case OP_CLOSURE: {
@@ -435,6 +497,37 @@ static InterpretResult run()
         case OP_SET_UPVALUE: {
             uint8_t slot = READ_BYTE();
             *frame->closure->upvalues[slot]->location = peek(0);
+            break;
+        }
+        case OP_GET_PROPERTY: {
+            uint32_t propAddr = READ_BYTE();
+
+            if (!getProperty(frame, peek(0), propAddr)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_PROPERTY_LONG: {
+            uint32_t propAddr = READ_UINT24();
+            if (!getProperty(frame, peek(0), propAddr)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY: {
+            uint32_t propAddr = READ_BYTE();
+            if (!setProperty(frame, peek(1), propAddr)) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY_LONG: {
+            uint32_t propAddr = READ_UINT24();
+            if (!setProperty(frame, peek(1), propAddr)) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
             break;
         }
         case OP_EQUAL: {

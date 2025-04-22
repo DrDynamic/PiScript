@@ -3,6 +3,7 @@
 #include "natives.h"
 #include "value.h"
 #include "compiler.h"
+#include "util/memory.h"
 
 static Value clockNative(int argCount, Value* args)
 {
@@ -12,7 +13,17 @@ static Value clockNative(int argCount, Value* args)
 }
 
 
+static Value collectGarbageNative(int argCount, Value* args)
+{
+    (void)args;
+    (void)argCount;
+
+    collectGarbage();
+    return NIL_VAL;
+}
+
 void defineNatives()
 {
     defineNative("clock", clockNative);
+    defineNative("collectGarbage", collectGarbageNative);
 }

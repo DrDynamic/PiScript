@@ -13,6 +13,17 @@ jobs:
     - name: Setup
       run: apt-get -q -y update && apt-get -q -y install git gcc cmake cppcheck libcmocka-dev
 
+    - name: Instal Dart
+      run: |
+        apt-get update -qy && apt-get install -qy apt-transport-https wget gpg
+        wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg  --dearmor -o /usr/share/keyrings/dart.gpg
+        echo 'deb [signed-by=/usr/share/keyrings/dart.gpg arch=amd64] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main' |  tee /etc/apt/sources.list.d/dart_stable.list
+        apt-get update -qy && apt-get install -qy dart
+
+    - name: Setup tools
+      working-directory: ${{github.workspace}}/tool
+      run: dart pub install
+
     - name: Configure
       # Configure CMake in a 'build' subdirectory.
       run: mkdir build && cd build && cmake .. 
@@ -26,6 +37,10 @@ jobs:
       # Execute tests defined by the CMake configuration.
       working-directory: ${{github.workspace}}/build
       run: make tests
+
+    - name: Integration tests
+      working-directory: ${{github.workspace}}
+      run: dart tool/bin/test.dart -i build/src/pit
 
     - name: Rsync
       if: ${{ github.ref == 'refs/heads/main' }} && ${{ github.event_name == 'push' }}

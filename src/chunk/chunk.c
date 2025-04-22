@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "util/memory.h"
+#include "vm.h"
 
 void initChunk(Chunk* chunk)
 {
@@ -47,7 +48,9 @@ void writeConstant(Chunk* chunk, Value value, int line, OpCode opCodeShort, OpCo
 
 uint32_t addConstant(Chunk* chunk, Value value)
 {
+    push(value);
     writeValueArray(&chunk->constants, value);
+    pop();
     return chunk->constants.count - 1;
 }
 
