@@ -18,6 +18,7 @@
 
 #include "../test.h"
 #include "chunk/chunk.h"
+#include "vm.h"
 
 #include <stdio.h>
 /**
@@ -196,6 +197,8 @@ static void chunk_can_be_freed(void** state)
  */
 int main(void)
 {
+    initVM();
+
     const struct CMUnitTest tests_nothing[] = {
         cmocka_unit_test(chunk_initializes),
         cmocka_unit_test(chunk_is_writable),
@@ -203,5 +206,8 @@ int main(void)
         cmocka_unit_test(chunk_can_be_freed),
         cmocka_unit_test(chunk_writes_constants),
     };
-    return cmocka_run_group_tests(tests_nothing, NULL, NULL);
+    int result = cmocka_run_group_tests(tests_nothing, NULL, NULL);
+
+    freeVM();
+    return result;
 }
