@@ -203,6 +203,42 @@ static inline bool checkGlobalDefined(uint32_t addr)
         || (IS_OBJ(vm.globals.values[addr]) && vm.globals.values[addr].as.obj == NULL);
 }
 
+static inline bool getProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
+{
+    if (!IS_INSTANCE(instanceValue)) {
+        runtimeError("Only instances value properties.");
+        return false;
+    }
+    ObjInstance* instance = AS_INSTANCE(instanceValue);
+    ObjString* name = AS_STRING(frame->closure->function->chunk.constants.values[propertyAddr]);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        pop();
+        push(value);
+        return true;
+    }
+
+    runtimeError("Undefined property '%s'.", name->chars);
+    return false;
+}
+
+static inline bool setProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
+{
+    if (!IS_INSTANCE(instanceValue)) {
+        runtimeError("Only instances have fields.");
+        return false;
+    }
+    ObjString* propName = AS_STRING(frame->closure->function->chunk.constants.values[propertyAddr]);
+
+    ObjInstance* instance = AS_INSTANCE(instanceValue);
+    tableSet(&instance->fields, propName, peek(0));
+    Value value = pop();
+    pop();
+    push(value);
+    return true;
+}
+
 static InterpretResult run()
 {
     CallFrame* frame = &vm.frames[vm.frameCount - 1];
@@ -461,6 +497,37 @@ static InterpretResult run()
         case OP_SET_UPVALUE: {
             uint8_t slot = READ_BYTE();
             *frame->closure->upvalues[slot]->location = peek(0);
+            break;
+        }
+        case OP_GET_PROPERTY: {
+            uint32_t propAddr = READ_BYTE();
+
+            if (!getProperty(frame, peek(0), propAddr)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_PROPERTY_LONG: {
+            uint32_t propAddr = READ_UINT24();
+            if (!getProperty(frame, peek(0), propAddr)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY: {
+            uint32_t propAddr = READ_BYTE();
+            if (!setProperty(frame, peek(1), propAddr)) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY_LONG: {
+            uint32_t propAddr = READ_UINT24();
+            if (!setProperty(frame, peek(1), propAddr)) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
             break;
         }
         case OP_EQUAL: {

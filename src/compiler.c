@@ -300,6 +300,7 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 static uint32_t identifierConstant(Token* name);
+static uint32_t firstOrMakeGlobal(Token* name);
 static int resolveLocal(Compiler* compiler, Token* name);
 static void and_(bool canAssign);
 static void or_(bool canAssign);
@@ -354,6 +355,19 @@ static void call(bool canAssign)
     uint8_t argCount = argumentList();
     emitByte(OP_CALL);
     emitByte(argCount);
+}
+
+static void dot(bool canAssign)
+{
+    consume(TOKEN_IDENTIFIER, "Expect property after '.'.");
+    uint32_t addr = identifierConstant(&parser.previous);
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        emitConstant(addr, parser.previous.line, OP_SET_PROPERTY, OP_SET_PROPERTY_LONG);
+    } else {
+        emitConstant(addr, parser.previous.line, OP_GET_PROPERTY, OP_GET_PROPERTY_LONG);
+    }
 }
 
 static void literal(bool canAssign)
@@ -430,7 +444,7 @@ static void namedVariable(Token name, bool canAssign)
         setOp = OP_SET_UPVALUE;
         setOpLong = 0xFF; // not supported
     } else {
-        addr = identifierConstant(&name);
+        addr = firstOrMakeGlobal(&name);
         var = &vm.globalProps.values[addr];
 
         getOp = OP_GET_GLOBAL;
@@ -483,7 +497,7 @@ ParseRule rules[] = {
     [TOKEN_LEFT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_RIGHT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_COMMA] = { NULL, NULL, PREC_NONE },
-    [TOKEN_DOT] = { NULL, NULL, PREC_NONE },
+    [TOKEN_DOT] = { NULL, dot, PREC_CALL },
     [TOKEN_MINUS] = { unary, binary, PREC_TERM },
     [TOKEN_PLUS] = { NULL, binary, PREC_TERM },
     [TOKEN_SEMICOLON] = { NULL, NULL, PREC_NONE },
@@ -545,6 +559,12 @@ static void parsePrecedence(Precedence precedence)
 }
 
 static uint32_t identifierConstant(Token* name)
+{
+    ObjString* identifier = copyString(name->start, name->length);
+    return makeConstant(OBJ_VAL(identifier));
+}
+
+static uint32_t firstOrMakeGlobal(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
@@ -676,7 +696,7 @@ static uint32_t parseVariable(const char* errorMessage)
         return localAddr;
     }
 
-    return identifierConstant(&parser.previous);
+    return firstOrMakeGlobal(&parser.previous);
 }
 
 static void markInitialized()
