@@ -20,6 +20,10 @@ jobs:
         echo 'deb [signed-by=/usr/share/keyrings/dart.gpg arch=amd64] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main' |  tee /etc/apt/sources.list.d/dart_stable.list
         apt-get update -qy && apt-get install -qy dart
 
+    - name: Setup tools
+      working-directory: ${{github.workspace}}/tool
+      run: dart pub install
+
     - name: Configure
       # Configure CMake in a 'build' subdirectory.
       run: mkdir build && cd build && cmake .. 
