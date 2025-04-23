@@ -276,7 +276,7 @@ static void freeCompiler(Compiler* compiler)
     freeTable(&compiler->localNames);
     freeVarArray(&compiler->localProps);
 
-    initCompiler(compiler, TYPE_SCRIPT);
+    //    initCompiler(compiler, TYPE_SCRIPT);
 }
 
 static ObjFunction* endCompiler()
@@ -289,9 +289,9 @@ static ObjFunction* endCompiler()
             currentChunk(), function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
-    // TODO: fix memory leak
-    //    freeCompiler(current);
-    current = current->enclosing;
+    Compiler* enclosing = current->enclosing;
+    freeCompiler(current);
+    current = enclosing;
     return function;
 }
 
