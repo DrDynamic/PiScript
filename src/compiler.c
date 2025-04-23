@@ -797,18 +797,34 @@ static void function(FunctionType type)
     }
 }
 
+static void method()
+{
+    consume(TOKEN_IDENTIFIER, "Expect method name.");
+    uint32_t constantAddr = identifierConstant(&parser.previous);
+
+    FunctionType type = TYPE_FUNCTION;
+    function(type);
+
+    emitConstant(constantAddr, OP_METHOD, OP_METHOD_LONG);
+}
+
 static void classDeclaration()
 {
     uint32_t varAddr = parseVariable("Expect class name.");
+    Token className = parser.previous;
     // TODO: remove name from class declaration?
-    uint32_t nameAddr
-        = makeConstant(OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
-
+    uint32_t nameAddr = identifierConstant(&parser.previous);
     emitConstant(nameAddr, parser.previous.line, OP_CLASS, OP_CLASS_LONG);
-
     defineVariable(varAddr, true);
+
+    namedVariable(className, false);
+
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        method();
+    }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+    emitByte(OP_POP);
 }
 
 static void funDeclaration()
