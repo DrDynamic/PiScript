@@ -41,7 +41,11 @@ typedef struct {
     Precedence precedence;
 } ParseRule;
 
-typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
+typedef enum {
+    TYPE_FUNCTION,
+    TYPE_METHOD,
+    TYPE_SCRIPT,
+} FunctionType;
 
 typedef struct {
     uint8_t index;
@@ -63,9 +67,14 @@ typedef struct Compiler {
     int scopeDepth;
 } Compiler;
 
+typedef struct ClassCompiler {
+    struct ClassCompiler* enclosing;
+} ClassCompiler;
+
+
 Parser parser;
 Compiler* current = NULL;
-
+ClassCompiler* currentClass = NULL;
 static Chunk* currentChunk()
 {
     return &current->function->chunk;
@@ -231,14 +240,28 @@ static void initCompiler(Compiler* compiler, FunctionType type)
         current->function->name = copyString(parser.previous.start, parser.previous.length);
     }
 
-    writeVarArray(&current->localProps,
-        (Var) {
-            .depth = -1,
-            .identifier = NULL,
-            .shadowAddr = -1,
-            .readonly = true,
-            .isCaptured = false,
-        });
+    if (type != TYPE_FUNCTION) {
+        // if (type == TYPE_METHOD) {
+        ObjString* identifier = copyString("this", 4);
+        writeVarArray(&current->localProps,
+            (Var) {
+                .depth = 0,
+                .identifier = identifier,
+                .shadowAddr = -1,
+                .readonly = true,
+                .isCaptured = false,
+            });
+        tableSetUint32(&current->localNames, identifier, 0);
+    } else {
+        writeVarArray(&current->localProps,
+            (Var) {
+                .depth = -1,
+                .identifier = NULL,
+                .shadowAddr = -1,
+                .readonly = true,
+                .isCaptured = false,
+            });
+    }
 }
 
 static void freeCompiler(Compiler* compiler)
@@ -471,6 +494,17 @@ static void variable(bool canAssign)
     namedVariable(parser.previous, canAssign);
 }
 
+static void this_(bool canAssign)
+{
+    (void)canAssign;
+
+    if (currentClass == NULL) {
+        error("Can't use 'this' outside of a class.");
+        return;
+    }
+    variable(false);
+}
+
 static void unary(bool canAssign)
 {
     (void)canAssign;
@@ -526,7 +560,7 @@ ParseRule rules[] = {
     [TOKEN_PRINT] = { NULL, NULL, PREC_NONE },
     [TOKEN_RETURN] = { NULL, NULL, PREC_NONE },
     [TOKEN_SUPER] = { NULL, NULL, PREC_NONE },
-    [TOKEN_THIS] = { NULL, NULL, PREC_NONE },
+    [TOKEN_THIS] = { this_, NULL, PREC_NONE },
     [TOKEN_TRUE] = { literal, NULL, PREC_NONE },
     [TOKEN_VAR] = { NULL, NULL, PREC_NONE },
     [TOKEN_CONST] = { NULL, NULL, PREC_NONE },
@@ -802,7 +836,7 @@ static void method()
     consume(TOKEN_IDENTIFIER, "Expect method name.");
     uint32_t constantAddr = identifierConstant(&parser.previous);
 
-    FunctionType type = TYPE_FUNCTION;
+    FunctionType type = TYPE_METHOD;
     function(type);
 
     emitConstant(constantAddr, parser.previous.line, OP_METHOD, OP_METHOD_LONG);
@@ -817,6 +851,10 @@ static void classDeclaration()
     emitConstant(nameAddr, parser.previous.line, OP_CLASS, OP_CLASS_LONG);
     defineVariable(varAddr, true);
 
+    ClassCompiler classCompiler;
+    classCompiler.enclosing = currentClass;
+    currentClass = &classCompiler;
+
     namedVariable(className, false);
 
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
@@ -825,6 +863,8 @@ static void classDeclaration()
     }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
     emitByte(OP_POP);
+
+    currentClass = currentClass->enclosing;
 }
 
 static void funDeclaration()
