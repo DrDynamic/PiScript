@@ -207,7 +207,7 @@ static void markRoots()
     markValueArray(&vm.globals);
 
     // compiler
-    markTable(&vm.globalAddresses);
+    markTable(&vm.gloablsTable.addresses);
     // markVarArray(&vm.globalProps);
 
     markCompilerRoots();

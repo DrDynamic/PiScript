@@ -476,7 +476,7 @@ static void namedVariable(Token name, bool canAssign)
         setOpLong = 0xFF; // not supported
     } else {
         addr = firstOrMakeGlobal(&name);
-        var = &vm.globalProps.values[addr];
+        var = addresstableGetProps(&vm.gloablsTable, addr);
 
         getOp = OP_GET_GLOBAL;
         getOpLong = OP_GET_GLOBAL_LONG;
@@ -610,13 +610,15 @@ static uint32_t firstOrMakeGlobal(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&vm.globalAddresses, identifier, &addr)) {
+    if (addresstableGetAddress(&vm.gloablsTable, identifier, &addr)) {
         return addr;
     }
 
-    addr = vm.globalCount++;
-    tableSetUint32(&vm.globalAddresses, identifier, addr);
-    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = false });
+    addr = addresstableAdd(&vm.gloablsTable, identifier,
+        (Var) {
+            .identifier = identifier,
+            .readonly = false,
+        });
 
     return addr;
 }
@@ -743,7 +745,7 @@ static void defineVariable(uint32_t addr, bool readonly)
         return;
     }
 
-    vm.globalProps.values[addr].readonly = readonly;
+    addresstableGetProps(&vm.gloablsTable, addr)->readonly = readonly;
     emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
 }
 
@@ -1077,9 +1079,11 @@ void defineNative(const char* name, NativeFn function)
     ObjNative* native = newNative(function);
     push(OBJ_VAL(native));
 
-    uint32_t addr = vm.globalCount++;
-    tableSetUint32(&vm.globalAddresses, identifier, addr);
-    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = true });
+    addresstableAdd(&vm.gloablsTable, identifier,
+        (Var) {
+            .identifier = identifier,
+            .readonly = true,
+        });
     writeValueArray(&vm.globals, OBJ_VAL(native));
 
     pop();

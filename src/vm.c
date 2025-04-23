@@ -243,9 +243,7 @@ void initVM()
     initValueArray(&vm.globals);
     initTable(&vm.strings);
 
-    initTable(&vm.globalAddresses);
-    initVarArray(&vm.globalProps);
-    vm.globalCount = 0;
+    initAddressTable(&vm.gloablsTable);
 
     vm.initString = NULL;
     vm.initString = copyString("init", 4);
@@ -259,9 +257,7 @@ void freeVM()
     freeTable(&vm.strings);
     freeObjects();
 
-    freeTable(&vm.globalAddresses);
-    freeVarArray(&vm.globalProps);
-    vm.globalCount = 0;
+    freeAddressTable(&vm.gloablsTable);
 
     vm.initString = NULL;
 }
