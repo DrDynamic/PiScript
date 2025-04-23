@@ -3,8 +3,12 @@ class CoffeeMaker {
     this.coffee = coffee;
   }
 
+  refill(coffee) {
+    this.coffee = coffee;
+  }
+
   brew() {
-    print "Enjoy your cup of " + this.coffee;
+//    print "Enjoy your cup of " + this.coffee;
 
     // No reusing the grounds!
     this.coffee = nil;
@@ -12,4 +16,25 @@ class CoffeeMaker {
 }
 
 var maker = CoffeeMaker("coffee and chicory");
-maker.brew();
+var start = clock()
+for(var i = 0; i< 10000;i = i+1) {
+    maker.brew();
+    maker.refill("coffee and chicory");
+}
+var brewTime = clock() - start
+print "brewed in"
+print brewTime 
+// without invoke 0.021668
+// with invoke    0.003284
+
+
+class A {
+    init() {
+        fun f() {
+            print "Hi"
+        }
+        this.field = f;
+    }
+}
+
+A().field()

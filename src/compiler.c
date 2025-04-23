@@ -393,6 +393,10 @@ static void dot(bool canAssign)
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
         emitConstant(addr, parser.previous.line, OP_SET_PROPERTY, OP_SET_PROPERTY_LONG);
+    } else if (match(TOKEN_LEFT_PAREN)) {
+        uint8_t argCount = argumentList();
+        emitConstant(addr, parser.previous.line, OP_INVOKE, OP_INVOKE_LONG);
+        emitByte(argCount);
     } else {
         emitConstant(addr, parser.previous.line, OP_GET_PROPERTY, OP_GET_PROPERTY_LONG);
     }
