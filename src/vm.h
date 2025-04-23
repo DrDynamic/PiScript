@@ -27,6 +27,8 @@ typedef struct {
     ObjUpvalue* openUpvalues;
     Obj* objects;
 
+    ObjString* initString;
+
     // used by compiler
     Table globalAddresses;
     VarArray globalProps;

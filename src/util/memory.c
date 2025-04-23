@@ -211,6 +211,7 @@ static void markRoots()
     // markVarArray(&vm.globalProps);
 
     markCompilerRoots();
+    markObject((Obj*)vm.initString);
 }
 
 static void traceReferences()
