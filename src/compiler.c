@@ -248,6 +248,7 @@ static void initCompiler(Compiler* compiler, FunctionType type)
     if (type != TYPE_FUNCTION) {
         // if (type == TYPE_METHOD) {
         ObjString* identifier = copyString("this", 4);
+        push(OBJ_VAL(identifier));
         writeVarArray(&current->localProps,
             (Var) {
                 .depth = 0,
@@ -257,6 +258,7 @@ static void initCompiler(Compiler* compiler, FunctionType type)
                 .isCaptured = false,
             });
         tableSetUint32(&current->localNames, identifier, 0);
+        pop();
     } else {
         writeVarArray(&current->localProps,
             (Var) {
