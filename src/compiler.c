@@ -805,7 +805,7 @@ static void method()
     FunctionType type = TYPE_FUNCTION;
     function(type);
 
-    emitConstant(constantAddr, OP_METHOD, OP_METHOD_LONG);
+    emitConstant(constantAddr, parser.previous.line, OP_METHOD, OP_METHOD_LONG);
 }
 
 static void classDeclaration()

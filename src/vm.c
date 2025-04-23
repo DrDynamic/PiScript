@@ -85,6 +85,10 @@ static bool callValue(Value callee, int argCount)
 {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+        case OBJ_BOUND_METHOD: {
+            ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
+            return call(bound->method, argCount);
+        }
         case OBJ_CLASS: {
             ObjClass* klass = AS_CLASS(callee);
             vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
@@ -106,6 +110,20 @@ static bool callValue(Value callee, int argCount)
     }
     runtimeError("Can only call functions and classes.");
     return false;
+}
+
+static bool bindMethod(ObjClass* klass, ObjString* name)
+{
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+
+    ObjBoundMethod* bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+    pop();
+    push(OBJ_VAL(bound));
+    return true;
 }
 
 static ObjUpvalue* captureUpvalue(Value* local)
@@ -227,8 +245,7 @@ static inline bool getProperty(CallFrame* frame, Value instanceValue, uint32_t p
         return true;
     }
 
-    runtimeError("Undefined property '%s'.", name->chars);
-    return false;
+    return bindMethod(instance->klass, name);
 }
 
 static inline bool setProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
@@ -356,14 +373,16 @@ static InterpretResult run()
             push(OBJ_VAL(newClass(GET_STRING(addr))));
             break;
         }
-        case OP_METHOD:
+        case OP_METHOD: {
             uint32_t addr = READ_BYTE();
             defineMethod(GET_STRING(addr));
             break;
-        case OP_METHOD_LONG:
+        }
+        case OP_METHOD_LONG: {
             uint32_t addr = READ_UINT24();
             defineMethod(GET_STRING(addr));
             break;
+        }
         case OP_CLOSURE: {
             uint8_t addr = READ_BYTE();
             Value constant = GET_CONSTANT(addr);
