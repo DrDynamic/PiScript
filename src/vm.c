@@ -5,9 +5,9 @@
 #include "common.h"
 #include "vm.h"
 #include "compiler.h"
-#include "debug.h"
+#include "util/debug.h"
 // #include "object.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "natives.h"
 
 VM vm;
