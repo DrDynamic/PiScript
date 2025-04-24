@@ -636,6 +636,26 @@ static InterpretResult run()
             }
             break;
         }
+        case OP_GET_SUPER: {
+            uint32_t addr = READ_BYTE();
+            ObjString* name = GET_STRING(addr);
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_SUPER_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* name = GET_STRING(addr);
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
         case OP_EQUAL: {
             Value a = pop();
             Value b = pop();
