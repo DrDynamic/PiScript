@@ -1,6 +1,10 @@
-class Pair {}
+var test = "TEST"
+fun f() {
+  for (;;) {
+    var i = "i";
+    return i;
+  }
+}
 
-var pair = Pair();
-pair.first = 1;
-pair.second = 2;
-print pair.first + pair.second; // 3.
+print f();
+// expect: i

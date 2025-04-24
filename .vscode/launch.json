@@ -10,10 +10,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/src/pit",
             "args": [
-                "../test.lox"
+                "./test.lox"
             ],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

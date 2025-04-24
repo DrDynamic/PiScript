@@ -5,6 +5,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+#include "util/addresstable.h"
 #include "util/VarArray.h"
 #include "util/memory.h"
 
@@ -41,7 +42,12 @@ typedef struct {
     Precedence precedence;
 } ParseRule;
 
-typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
+typedef enum {
+    TYPE_FUNCTION,
+    TYPE_INITIALIZER,
+    TYPE_METHOD,
+    TYPE_SCRIPT,
+} FunctionType;
 
 typedef struct {
     uint8_t index;
@@ -55,17 +61,21 @@ typedef struct Compiler {
     ObjFunction* function;
     FunctionType type;
 
-    Table localNames;
-    VarArray localProps;
+    AddressTable locals;
 
     Upvalue upvalues[UINT8_COUNT];
 
     int scopeDepth;
 } Compiler;
 
+typedef struct ClassCompiler {
+    struct ClassCompiler* enclosing;
+} ClassCompiler;
+
+
 Parser parser;
 Compiler* current = NULL;
-
+ClassCompiler* currentClass = NULL;
 static Chunk* currentChunk()
 {
     return &current->function->chunk;
@@ -144,13 +154,13 @@ static void emitByte(uint8_t byte)
     writeChunk(currentChunk(), byte, parser.previous.line);
 }
 
-/*
+
 static void emitBytes(uint8_t byte1, uint8_t byte2)
 {
     emitByte(byte1);
     emitByte(byte2);
 }
-*/
+
 
 static void emitLoop(int loopStart)
 {
@@ -176,7 +186,11 @@ static int emitJump(uint8_t instruction)
 
 static void emitReturn()
 {
-    emitByte(OP_NIL);
+    if (current->type == TYPE_INITIALIZER) {
+        emitBytes(OP_GET_LOCAL, 0);
+    } else {
+        emitByte(OP_NIL);
+    }
     emitByte(OP_RETURN);
 }
 
@@ -220,8 +234,7 @@ static void initCompiler(Compiler* compiler, FunctionType type)
     compiler->function = NULL;
     compiler->type = type;
 
-    initTable(&compiler->localNames);
-    initVarArray(&compiler->localProps);
+    initAddressTable(&compiler->locals);
 
     compiler->scopeDepth = 0;
     compiler->function = newFunction();
@@ -231,22 +244,41 @@ static void initCompiler(Compiler* compiler, FunctionType type)
         current->function->name = copyString(parser.previous.start, parser.previous.length);
     }
 
-    writeVarArray(&current->localProps,
-        (Var) {
-            .depth = -1,
-            .identifier = NULL,
-            .shadowAddr = -1,
-            .readonly = true,
-            .isCaptured = false,
-        });
+    if (type != TYPE_FUNCTION) {
+        // if (type == TYPE_METHOD) {
+        ObjString* identifier = copyString("this", 4);
+        push(OBJ_VAL(identifier));
+
+        addresstableAdd(&current->locals, identifier,
+            (Var) {
+                .depth = 0,
+                .identifier = identifier,
+                .shadowAddr = -1,
+                .readonly = true,
+                .isCaptured = false,
+            });
+
+        pop();
+    } else {
+        ObjString* identifier = copyString("", 0);
+        push(OBJ_VAL(identifier));
+
+        addresstableAdd(&current->locals, identifier,
+            (Var) {
+                .depth = -1,
+                .identifier = NULL,
+                .shadowAddr = -1,
+                .readonly = true,
+                .isCaptured = false,
+            });
+
+        pop();
+    }
 }
 
 static void freeCompiler(Compiler* compiler)
 {
-    freeTable(&compiler->localNames);
-    freeVarArray(&compiler->localProps);
-
-    initCompiler(compiler, TYPE_SCRIPT);
+    freeAddressTable(&compiler->locals);
 }
 
 static ObjFunction* endCompiler()
@@ -259,9 +291,9 @@ static ObjFunction* endCompiler()
             currentChunk(), function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
-    // TODO: fix memory leak
-    //    freeCompiler(current);
-    current = current->enclosing;
+    Compiler* enclosing = current->enclosing;
+    freeCompiler(current);
+    current = enclosing;
     return function;
 }
 
@@ -274,22 +306,17 @@ static void endScope()
 {
     current->scopeDepth--;
 
-    while (current->localProps.count > 0
-        && current->localProps.values[current->localProps.count - 1].depth > current->scopeDepth) {
+    AddressTable* locals = &current->locals;
+    while (!addresstableIsEmpty(locals)
+        && addresstableGetLastProps(locals)->depth > current->scopeDepth) {
+        Var* local = addresstableGetLastProps(locals);
+        addresstablePop(locals);
 
-        Var* local = &current->localProps.values[current->localProps.count - 1];
-        if (local->shadowAddr != -1) {
-            tableSetUint32(&current->localNames, local->identifier, local->shadowAddr);
-        } else {
-            tableDelete(&current->localNames, local->identifier);
-        }
-
-        if (current->localProps.values[current->localProps.count - 1].isCaptured) {
+        if (local->isCaptured) {
             emitByte(OP_CLOSE_UPVALUE);
         } else {
             emitByte(OP_POP);
         }
-        current->localProps.count--;
     }
 }
 
@@ -365,6 +392,10 @@ static void dot(bool canAssign)
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
         emitConstant(addr, parser.previous.line, OP_SET_PROPERTY, OP_SET_PROPERTY_LONG);
+    } else if (match(TOKEN_LEFT_PAREN)) {
+        uint8_t argCount = argumentList();
+        emitConstant(addr, parser.previous.line, OP_INVOKE, OP_INVOKE_LONG);
+        emitByte(argCount);
     } else {
         emitConstant(addr, parser.previous.line, OP_GET_PROPERTY, OP_GET_PROPERTY_LONG);
     }
@@ -432,7 +463,7 @@ static void namedVariable(Token name, bool canAssign)
     int addr = resolveLocal(current, &name);
     Var* var = NULL;
     if (addr != -1) {
-        var = &current->localProps.values[addr];
+        var = addresstableGetProps(&current->locals, addr);
 
         getOp = OP_GET_LOCAL;
         getOpLong = OP_GET_LOCAL_LONG;
@@ -445,7 +476,7 @@ static void namedVariable(Token name, bool canAssign)
         setOpLong = 0xFF; // not supported
     } else {
         addr = firstOrMakeGlobal(&name);
-        var = &vm.globalProps.values[addr];
+        var = addresstableGetProps(&vm.gloablsTable, addr);
 
         getOp = OP_GET_GLOBAL;
         getOpLong = OP_GET_GLOBAL_LONG;
@@ -469,6 +500,17 @@ static void namedVariable(Token name, bool canAssign)
 static void variable(bool canAssign)
 {
     namedVariable(parser.previous, canAssign);
+}
+
+static void this_(bool canAssign)
+{
+    (void)canAssign;
+
+    if (currentClass == NULL) {
+        error("Can't use 'this' outside of a class.");
+        return;
+    }
+    variable(false);
 }
 
 static void unary(bool canAssign)
@@ -526,7 +568,7 @@ ParseRule rules[] = {
     [TOKEN_PRINT] = { NULL, NULL, PREC_NONE },
     [TOKEN_RETURN] = { NULL, NULL, PREC_NONE },
     [TOKEN_SUPER] = { NULL, NULL, PREC_NONE },
-    [TOKEN_THIS] = { NULL, NULL, PREC_NONE },
+    [TOKEN_THIS] = { this_, NULL, PREC_NONE },
     [TOKEN_TRUE] = { literal, NULL, PREC_NONE },
     [TOKEN_VAR] = { NULL, NULL, PREC_NONE },
     [TOKEN_CONST] = { NULL, NULL, PREC_NONE },
@@ -568,13 +610,15 @@ static uint32_t firstOrMakeGlobal(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&vm.globalAddresses, identifier, &addr)) {
+    if (addresstableGetAddress(&vm.gloablsTable, identifier, &addr)) {
         return addr;
     }
 
-    addr = vm.globalCount++;
-    tableSetUint32(&vm.globalAddresses, identifier, addr);
-    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = false });
+    addr = addresstableAdd(&vm.gloablsTable, identifier,
+        (Var) {
+            .identifier = identifier,
+            .readonly = false,
+        });
 
     return addr;
 }
@@ -583,12 +627,14 @@ static int resolveLocal(Compiler* compiler, Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&compiler->localNames, identifier, &addr)) {
-        if (compiler->localProps.values[addr].depth == -1) {
+
+    if (addresstableGetAddress(&compiler->locals, identifier, &addr)) {
+        if (addresstableGetProps(&compiler->locals, addr)->depth == -1) {
             error("Can't read local variable in its own initializer.");
         }
         return addr;
     }
+
     return -1;
 }
 
@@ -622,8 +668,9 @@ static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps)
 
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
-        compiler->enclosing->localProps.values[local].isCaptured = true;
-        *varProps = &compiler->localProps.values[local];
+        addresstableGetProps(&compiler->enclosing->locals, local)->isCaptured = true;
+        *varProps = addresstableGetProps(
+            &compiler->enclosing->locals, local); // TODO: check - added enclosing
         return addUpvalue(compiler, (uint32_t)local, true, *varProps);
     }
 
@@ -640,31 +687,14 @@ static uint32_t addLocal(Token name)
     ObjString* identifier = copyString(name.start, name.length);
     push(OBJ_VAL(identifier));
 
-    uint32_t addr;
-    if (tableGetUint32(&current->localNames, identifier, &addr)) {
-
-        tableSetUint32(&current->localNames, identifier, current->localProps.count);
-        writeVarArray(&current->localProps,
-            (Var) {
-                .identifier = identifier,
-                .depth = -1,
-                .readonly = false,
-                .shadowAddr = addr,
-                .isCaptured = false,
-            });
-
-    } else {
-        tableSetUint32(&current->localNames, identifier, current->localProps.count);
-        writeVarArray(&current->localProps,
-            (Var) {
-                .identifier = identifier,
-                .depth = -1,
-                .readonly = false,
-                .shadowAddr = -1,
-                .isCaptured = false,
-            });
-        addr = current->localProps.count - 1;
-    }
+    uint32_t addr = addresstableAdd(&current->locals, identifier,
+        (Var) {
+            .identifier = identifier,
+            .depth = -1,
+            .readonly = false,
+            .shadowAddr = -1,
+            .isCaptured = false,
+        });
     pop(); // identifier
     return addr;
 }
@@ -677,8 +707,8 @@ static uint32_t declareVariable()
     Token* name = &parser.previous;
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&current->localNames, identifier, &addr)) {
-        if (current->localProps.values[addr].depth == current->scopeDepth) {
+    if (addresstableGetAddress(&current->locals, identifier, &addr)) {
+        if (addresstableGetProps(&current->locals, addr)->depth == current->scopeDepth) {
             error("Already a variable with this name in this scope.");
         }
     }
@@ -704,18 +734,18 @@ static void markInitialized()
     if (current->scopeDepth == 0) {
         return;
     }
-    current->localProps.values[current->localProps.count - 1].depth = current->scopeDepth;
+    addresstableGetLastProps(&current->locals)->depth = current->scopeDepth;
 }
 
 static void defineVariable(uint32_t addr, bool readonly)
 {
     if (current->scopeDepth > 0) {
         markInitialized();
-        current->localProps.values[addr].readonly = readonly;
+        addresstableGetProps(&current->locals, addr)->readonly = readonly;
         return;
     }
 
-    vm.globalProps.values[addr].readonly = readonly;
+    addresstableGetProps(&vm.gloablsTable, addr)->readonly = readonly;
     emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
 }
 
@@ -797,18 +827,43 @@ static void function(FunctionType type)
     }
 }
 
+static void method()
+{
+    consume(TOKEN_IDENTIFIER, "Expect method name.");
+    uint32_t constantAddr = identifierConstant(&parser.previous);
+
+    FunctionType type = TYPE_METHOD;
+    if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
+        type = TYPE_INITIALIZER;
+    }
+    function(type);
+
+    emitConstant(constantAddr, parser.previous.line, OP_METHOD, OP_METHOD_LONG);
+}
+
 static void classDeclaration()
 {
     uint32_t varAddr = parseVariable("Expect class name.");
+    Token className = parser.previous;
     // TODO: remove name from class declaration?
-    uint32_t nameAddr
-        = makeConstant(OBJ_VAL(copyString(parser.previous.start, parser.previous.length)));
-
+    uint32_t nameAddr = identifierConstant(&parser.previous);
     emitConstant(nameAddr, parser.previous.line, OP_CLASS, OP_CLASS_LONG);
-
     defineVariable(varAddr, true);
+
+    ClassCompiler classCompiler;
+    classCompiler.enclosing = currentClass;
+    currentClass = &classCompiler;
+
+    namedVariable(className, false);
+
     consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        method();
+    }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+    emitByte(OP_POP);
+
+    currentClass = currentClass->enclosing;
 }
 
 static void funDeclaration()
@@ -926,6 +981,9 @@ static void returnStatement()
     if (match(TOKEN_SEMICOLON)) {
         emitReturn();
     } else {
+        if (current->type == TYPE_INITIALIZER) {
+            error("Can't return a value from an initializer.");
+        }
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
         emitByte(OP_RETURN);
@@ -1021,9 +1079,11 @@ void defineNative(const char* name, NativeFn function)
     ObjNative* native = newNative(function);
     push(OBJ_VAL(native));
 
-    uint32_t addr = vm.globalCount++;
-    tableSetUint32(&vm.globalAddresses, identifier, addr);
-    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = true });
+    addresstableAdd(&vm.gloablsTable, identifier,
+        (Var) {
+            .identifier = identifier,
+            .readonly = true,
+        });
     writeValueArray(&vm.globals, OBJ_VAL(native));
 
     pop();
@@ -1054,7 +1114,7 @@ void markCompilerRoots()
     Compiler* compiler = current;
     while (compiler != NULL) {
         markObject((Obj*)compiler->function);
-        markTable(&compiler->localNames);
+        markTable(&compiler->locals.addresses);
         compiler = compiler->enclosing;
     }
 }

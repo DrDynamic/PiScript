@@ -1,8 +1,8 @@
 #include <stdio.h>
 
 #include "debug.h"
-#include "value.h"
-#include "object.h"
+#include "../value.h"
+#include "../object.h"
 
 void disassembleChunk(Chunk* chunk, const char* name)
 {
@@ -87,6 +87,29 @@ static int closureInstruction(const char* name, uint32_t constantIndex, Chunk* c
     return offset;
 }
 
+static int invokeInstruction(const char* name, bool isLong, Chunk* chunk, int offset)
+{
+    uint32_t addr = chunk->code[offset + 1];
+    uint8_t argCount = chunk->code[offset + 2];
+    if (isLong) {
+        uint8_t idx1 = chunk->code[offset + 1];
+        uint8_t idx2 = chunk->code[offset + 2];
+        uint8_t idx3 = chunk->code[offset + 3];
+
+        addr = (idx1 << 16) | (idx2 << 8) | idx3;
+        argCount = chunk->code[offset + 4];
+
+        offset = offset + 5;
+    } else {
+        offset = offset + 3;
+    }
+    printf("%-16s (%d args) %4d '", name, argCount, addr);
+    printValue(chunk->constants.values[addr]);
+    printf("'\n");
+
+    return offset;
+}
+
 int disassembleInstruction(Chunk* chunk, int offset)
 {
     printf("[%04d] ", offset);
@@ -121,6 +144,10 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return jumpInstruction("OP_LOOP", -1, chunk, offset);
     case OP_CALL:
         return byteInstruction("OP_CALL", chunk, offset);
+    case OP_INVOKE:
+        return invokeInstruction("OP_INVOKE", false, chunk, offset);
+    case OP_INVOKE_LONG:
+        return invokeInstruction("OP_INVOKE_LONG", true, chunk, offset);
     case OP_CLOSURE: {
         offset++;
         uint8_t constant = chunk->code[offset++];
@@ -146,6 +173,10 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return byteInstruction("OP_CLASS", chunk, offset);
     case OP_CLASS_LONG:
         return uint24Instruction("OP_CLASS_LONG", chunk, offset);
+    case OP_METHOD:
+        return constantInstruction("OP_METHOD", chunk, offset);
+    case OP_METHOD_LONG:
+        return constantLongInstruction("OP_METHOD_LONG", chunk, offset);
     case OP_CONSTANT:
         return constantInstruction("OP_CONSTANT", chunk, offset);
     case OP_CONSTANT_LONG:

@@ -4,6 +4,7 @@
 #include "table.h"
 #include "value.h"
 #include "util/VarArray.h"
+#include "util/addresstable.h"
 
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
@@ -27,14 +28,15 @@ typedef struct {
     ObjUpvalue* openUpvalues;
     Obj* objects;
 
+    ObjString* initString;
+
     // used by compiler
-    Table globalAddresses;
-    VarArray globalProps;
-    uint32_t globalCount;
+    AddressTable gloablsTable;
 
     // garbage collection
     size_t bytesAllocated;
     size_t nextGC;
+
     int grayCount;
     int grayCapacity;
     Obj** grayStack;

@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 #include "chunk.h"
-#include "util/memory.h"
-#include "vm.h"
+#include "../util/memory.h"
+#include "../vm.h"
 
 void initChunk(Chunk* chunk)
 {

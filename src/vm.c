@@ -5,9 +5,9 @@
 #include "common.h"
 #include "vm.h"
 #include "compiler.h"
-#include "debug.h"
+#include "util/debug.h"
 // #include "object.h"
-#include "memory.h"
+#include "util/memory.h"
 #include "natives.h"
 
 VM vm;
@@ -85,9 +85,21 @@ static bool callValue(Value callee, int argCount)
 {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+        case OBJ_BOUND_METHOD: {
+            ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
+            vm.stackTop[-argCount - 1] = bound->receiver;
+            return call(bound->method, argCount);
+        }
         case OBJ_CLASS: {
             ObjClass* klass = AS_CLASS(callee);
             vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+            Value initializer;
+            if (tableGet(&klass->methods, vm.initString, &initializer)) {
+                return call(AS_CLOSURE(initializer), argCount);
+            } else if (argCount != 0) {
+                runtimeError("Expected 0 arguments but got %d", argCount);
+                return false;
+            }
             return true;
         }
         case OBJ_CLOSURE:
@@ -106,6 +118,50 @@ static bool callValue(Value callee, int argCount)
     }
     runtimeError("Can only call functions and classes.");
     return false;
+}
+
+static bool invokeFromClass(ObjClass* klass, ObjString* name, uint8_t argCount)
+{
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("undefined property '%s'.", name->chars);
+        return false;
+    }
+
+    return call(AS_CLOSURE(method), argCount);
+}
+static bool invoke(ObjString* name, uint8_t argCount)
+{
+    Value receiver = peek(argCount);
+
+    if (!IS_INSTANCE(receiver)) {
+        runtimeError("Only instances have methods.");
+        return false;
+    }
+
+    ObjInstance* instance = AS_INSTANCE(receiver);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        vm.stackTop[-argCount - 1] = value;
+        return callValue(value, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+}
+
+static bool bindMethod(ObjClass* klass, ObjString* name)
+{
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+
+    ObjBoundMethod* bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+    pop();
+    push(OBJ_VAL(bound));
+    return true;
 }
 
 static ObjUpvalue* captureUpvalue(Value* local)
@@ -139,6 +195,14 @@ static void closeUpvalues(Value* last)
         upvalue->location = &upvalue->closed;
         vm.openUpvalues = upvalue->next;
     }
+}
+
+static void defineMethod(ObjString* name)
+{
+    Value method = peek(0);
+    ObjClass* klass = AS_CLASS(peek(1));
+    tableSet(&klass->methods, name, method);
+    pop();
 }
 
 static bool isFalsey(Value value)
@@ -179,9 +243,10 @@ void initVM()
     initValueArray(&vm.globals);
     initTable(&vm.strings);
 
-    initTable(&vm.globalAddresses);
-    initVarArray(&vm.globalProps);
-    vm.globalCount = 0;
+    initAddressTable(&vm.gloablsTable);
+
+    vm.initString = NULL;
+    vm.initString = copyString("init", 4);
 
     defineNatives();
 }
@@ -192,9 +257,9 @@ void freeVM()
     freeTable(&vm.strings);
     freeObjects();
 
-    freeTable(&vm.globalAddresses);
-    freeVarArray(&vm.globalProps);
-    vm.globalCount = 0;
+    freeAddressTable(&vm.gloablsTable);
+
+    vm.initString = NULL;
 }
 
 static inline bool checkGlobalDefined(uint32_t addr)
@@ -206,7 +271,7 @@ static inline bool checkGlobalDefined(uint32_t addr)
 static inline bool getProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
 {
     if (!IS_INSTANCE(instanceValue)) {
-        runtimeError("Only instances value properties.");
+        runtimeError("Only instances have properties.");
         return false;
     }
     ObjInstance* instance = AS_INSTANCE(instanceValue);
@@ -219,8 +284,7 @@ static inline bool getProperty(CallFrame* frame, Value instanceValue, uint32_t p
         return true;
     }
 
-    runtimeError("Undefined property '%s'.", name->chars);
-    return false;
+    return bindMethod(instance->klass, name);
 }
 
 static inline bool setProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
@@ -338,6 +402,26 @@ static InterpretResult run()
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_INVOKE: {
+            uint32_t addr = READ_BYTE();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            if (!invoke(method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_INVOKE_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            if (!invoke(method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
         case OP_CLASS: {
             uint32_t addr = READ_BYTE();
             push(OBJ_VAL(newClass(GET_STRING(addr))));
@@ -346,6 +430,16 @@ static InterpretResult run()
         case OP_CLASS_LONG: {
             uint32_t addr = READ_UINT24();
             push(OBJ_VAL(newClass(GET_STRING(addr))));
+            break;
+        }
+        case OP_METHOD: {
+            uint32_t addr = READ_BYTE();
+            defineMethod(GET_STRING(addr));
+            break;
+        }
+        case OP_METHOD_LONG: {
+            uint32_t addr = READ_UINT24();
+            defineMethod(GET_STRING(addr));
             break;
         }
         case OP_CLOSURE: {
