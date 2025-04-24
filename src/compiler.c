@@ -606,6 +606,13 @@ static uint32_t identifierConstant(Token* name)
     return makeConstant(OBJ_VAL(identifier));
 }
 
+static bool identifiersEqual(Token* a, Token* b)
+{
+    if (a->length != b->length)
+        return false;
+    return memcmp(a->start, b->start, a->length) == 0;
+}
+
 static uint32_t firstOrMakeGlobal(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
@@ -830,6 +837,7 @@ static void function(FunctionType type)
 static void method()
 {
     consume(TOKEN_IDENTIFIER, "Expect method name.");
+    // TODO: use addresses instead of strings to address methods
     uint32_t constantAddr = identifierConstant(&parser.previous);
 
     FunctionType type = TYPE_METHOD;
@@ -853,6 +861,18 @@ static void classDeclaration()
     ClassCompiler classCompiler;
     classCompiler.enclosing = currentClass;
     currentClass = &classCompiler;
+
+    if (match(TOKEN_LESS)) {
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        variable(false);
+
+        if (identifiersEqual(&className, &parser.previous)) {
+            error("A class can't inherit from itself.");
+        }
+
+        namedVariable(className, false);
+        emitByte(OP_INHERIT);
+    }
 
     namedVariable(className, false);
 

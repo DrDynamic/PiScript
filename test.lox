@@ -1,10 +1,19 @@
-var test = "TEST"
-fun f() {
-  for (;;) {
-    var i = "i";
-    return i;
+//var NotClass = "So not a class";
+//class OhNo < NotClass {}
+
+class Doughnut {
+  cook() {
+    print "Dunk in the fryer.";
   }
 }
 
-print f();
-// expect: i
+class Cruller < Doughnut {
+  finish() {
+    print "Glaze with icing.";
+  }
+}
+
+
+var cruller = Cruller();
+cruller.cook();
+cruller.finish();
