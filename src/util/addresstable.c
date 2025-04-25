@@ -59,13 +59,9 @@ inline bool addresstableGetAddress(AddressTable* table, ObjString* name, uint32_
     return tableGetUint32(&table->addresses, name, address);
 }
 
-inline bool addresstableGetName(AddressTable* table, uint32_t address, ObjString** name)
+inline ObjString* addresstableGetName(AddressTable* table, uint32_t address)
 {
-    if (table->props.count <= address) {
-        return false;
-    }
-    *name = table->props.values[address].identifier;
-    return true;
+    return table->props.values[address].identifier;
 }
 
 inline Var* addresstableGetLastProps(AddressTable* table)

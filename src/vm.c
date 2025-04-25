@@ -569,7 +569,8 @@ static InterpretResult run()
         case OP_GET_GLOBAL: {
             uint32_t addr = READ_BYTE();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             push(vm.globals.values[addr]);
@@ -578,7 +579,8 @@ static InterpretResult run()
         case OP_GET_GLOBAL_LONG: {
             uint32_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             push(vm.globals.values[addr]);
@@ -605,7 +607,8 @@ static InterpretResult run()
         case OP_SET_GLOBAL: {
             uint8_t addr = READ_BYTE();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             vm.globals.values[addr] = peek(0);
@@ -614,7 +617,8 @@ static InterpretResult run()
         case OP_SET_GLOBAL_LONG: {
             uint8_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             vm.globals.values[addr] = peek(0);

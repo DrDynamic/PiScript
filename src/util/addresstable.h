@@ -19,6 +19,6 @@ void addresstablePop(AddressTable* table);
 
 bool addresstableIsEmpty(AddressTable* table);
 bool addresstableGetAddress(AddressTable* table, ObjString* name, uint32_t* address);
-bool addresstableGetName(AddressTable* table, uint32_t address, ObjString** name);
+ObjString* addresstableGetName(AddressTable* table, uint32_t address);
 Var* addresstableGetLastProps(AddressTable* table);
 Var* addresstableGetProps(AddressTable* table, uint32_t address);
