@@ -124,7 +124,7 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name, uint8_t argCount)
 {
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
-        runtimeError("undefined property '%s'.", name->chars);
+        runtimeError("Undefined property '%s'.", name->chars);
         return false;
     }
 
@@ -460,7 +460,7 @@ static InterpretResult run()
         case OP_INHERIT: {
             Value superclass = peek(1);
             if (!IS_CLASS(superclass)) {
-                runtimeError("Superclass mus be a class.");
+                runtimeError("Superclass must be a class.");
                 return INTERPRET_RUNTIME_ERROR;
             }
             ObjClass* subClass = AS_CLASS(peek(0));

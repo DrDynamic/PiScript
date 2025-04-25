@@ -387,7 +387,7 @@ static void call(bool canAssign)
 
 static void dot(bool canAssign)
 {
-    consume(TOKEN_IDENTIFIER, "Expect property after '.'.");
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
     uint32_t addr = identifierConstant(&parser.previous);
 
     if (canAssign && match(TOKEN_EQUAL)) {
