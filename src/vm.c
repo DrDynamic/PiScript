@@ -422,6 +422,31 @@ static InterpretResult run()
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_SUPER_INVOKE: {
+            uint32_t addr = READ_BYTE();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_SUPER_INVOKE_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+            break;
+        }
         case OP_CLASS: {
             uint32_t addr = READ_BYTE();
             push(OBJ_VAL(newClass(GET_STRING(addr))));
