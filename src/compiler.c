@@ -949,8 +949,8 @@ static void varDeclaration(bool readonly)
     } else {
         emitByte(OP_NIL);
     }
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
 
     defineVariable(addr, readonly);
 }
@@ -958,8 +958,8 @@ static void varDeclaration(bool readonly)
 static void expressionStatement()
 {
     expression();
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
     emitByte(OP_POP);
 }
 
@@ -1033,8 +1033,8 @@ static void ifStatement()
 static void printStatement()
 {
     expression();
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expected ; after value.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expected ; after value.");
     emitByte(OP_PRINT);
 }
 
