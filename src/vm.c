@@ -97,7 +97,7 @@ static bool callValue(Value callee, int argCount)
             if (tableGet(&klass->methods, vm.initString, &initializer)) {
                 return call(AS_CLOSURE(initializer), argCount);
             } else if (argCount != 0) {
-                runtimeError("Expected 0 arguments but got %d", argCount);
+                runtimeError("Expected 0 arguments but got %d.", argCount);
                 return false;
             }
             return true;
