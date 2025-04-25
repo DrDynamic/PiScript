@@ -25,7 +25,7 @@ void freeTable(Table* table)
 
 static Entry* findEntry(Entry* entries, int capacity, ObjString* key)
 {
-    uint32_t index = key->hash % capacity;
+    uint32_t index = key->hash & (capacity - 1);
     Entry* tombstone = NULL;
 
     for (;;) {
@@ -45,7 +45,7 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key)
             return entry;
         }
 
-        index = (index + 1) % capacity;
+        index = (index + 1) & (capacity - 1);
     }
 }
 
@@ -118,16 +118,7 @@ bool tableGetUint32(Table* table, ObjString* key, uint32_t* value)
     if (table->count == 0) {
         return false;
     }
-    /*
-        printf("== tableGetUiclea &table->entries[i];
-            if (entry->key == NULL) {
-                printf("  [%d] NULL = '%d'\n", i, entry->as.uint32);
-            } else {
-                printf("  [%d] %s = '%d'\n", i, entry->key->chars, entry->as.uint32);
-            }
-        }
-        printf("==================\n");
-    */
+
     Entry* entry = findEntry(table->entries, table->capacity, key);
     if (entry->key == NULL) {
         return false;
@@ -190,7 +181,7 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
         return NULL;
     }
 
-    uint32_t index = hash % table->capacity;
+    uint32_t index = hash & (table->capacity - 1);
     for (;;) {
         Entry* entry = &table->entries[index];
         if (entry->key == NULL) {
@@ -203,7 +194,7 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
             return entry->key;
         }
 
-        index = (index + 1) % table->capacity;
+        index = (index + 1) & (table->capacity - 1);
     }
 }
 
