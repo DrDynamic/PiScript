@@ -445,7 +445,6 @@ static InterpretResult run()
             }
             frame = &vm.frames[vm.frameCount - 1];
             break;
-            break;
         }
         case OP_CLASS: {
             uint32_t addr = READ_BYTE();

@@ -508,6 +508,9 @@ static Token syntheticToken(const char* text)
     Token token;
     token.start = text;
     token.length = (int)strlen(text);
+    token.type = TOKEN_SYNTHETIC;
+    token.line = -1;
+
     return token;
 }
 
