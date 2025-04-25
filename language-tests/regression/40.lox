@@ -13,7 +13,7 @@ fun callCaller() {
     capturedVar = "after";
 
     // Returning anything also fixes it, even nil:
-    // return nil;
+    //return nil;
   }
 
   caller(f);

@@ -97,7 +97,7 @@ static bool callValue(Value callee, int argCount)
             if (tableGet(&klass->methods, vm.initString, &initializer)) {
                 return call(AS_CLOSURE(initializer), argCount);
             } else if (argCount != 0) {
-                runtimeError("Expected 0 arguments but got %d", argCount);
+                runtimeError("Expected 0 arguments but got %d.", argCount);
                 return false;
             }
             return true;
@@ -124,7 +124,7 @@ static bool invokeFromClass(ObjClass* klass, ObjString* name, uint8_t argCount)
 {
     Value method;
     if (!tableGet(&klass->methods, name, &method)) {
-        runtimeError("undefined property '%s'.", name->chars);
+        runtimeError("Undefined property '%s'.", name->chars);
         return false;
     }
 
@@ -422,6 +422,30 @@ static InterpretResult run()
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_SUPER_INVOKE: {
+            uint32_t addr = READ_BYTE();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_SUPER_INVOKE_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
         case OP_CLASS: {
             uint32_t addr = READ_BYTE();
             push(OBJ_VAL(newClass(GET_STRING(addr))));
@@ -430,6 +454,18 @@ static InterpretResult run()
         case OP_CLASS_LONG: {
             uint32_t addr = READ_UINT24();
             push(OBJ_VAL(newClass(GET_STRING(addr))));
+            break;
+        }
+        case OP_INHERIT: {
+            Value superclass = peek(1);
+            if (!IS_CLASS(superclass)) {
+                runtimeError("Superclass must be a class.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            ObjClass* subClass = AS_CLASS(peek(0));
+            tableAddAll(&AS_CLASS(superclass)->methods, &subClass->methods);
+            pop();
+
             break;
         }
         case OP_METHOD: {
@@ -532,7 +568,8 @@ static InterpretResult run()
         case OP_GET_GLOBAL: {
             uint32_t addr = READ_BYTE();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             push(vm.globals.values[addr]);
@@ -541,7 +578,8 @@ static InterpretResult run()
         case OP_GET_GLOBAL_LONG: {
             uint32_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             push(vm.globals.values[addr]);
@@ -568,7 +606,8 @@ static InterpretResult run()
         case OP_SET_GLOBAL: {
             uint8_t addr = READ_BYTE();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             vm.globals.values[addr] = peek(0);
@@ -577,7 +616,8 @@ static InterpretResult run()
         case OP_SET_GLOBAL_LONG: {
             uint8_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             vm.globals.values[addr] = peek(0);
@@ -620,6 +660,26 @@ static InterpretResult run()
             uint32_t propAddr = READ_UINT24();
             if (!setProperty(frame, peek(1), propAddr)) {
                 runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_SUPER: {
+            uint32_t addr = READ_BYTE();
+            ObjString* name = GET_STRING(addr);
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_SUPER_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* name = GET_STRING(addr);
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
                 return INTERPRET_RUNTIME_ERROR;
             }
             break;

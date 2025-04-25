@@ -47,6 +47,7 @@ typedef enum {
     TOKEN_CONST,
     TOKEN_WHILE,
 
+    TOKEN_SYNTHETIC,
     TOKEN_ERROR,
     TOKEN_EOF
 } TokenType;

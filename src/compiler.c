@@ -70,6 +70,7 @@ typedef struct Compiler {
 
 typedef struct ClassCompiler {
     struct ClassCompiler* enclosing;
+    bool hasSuperclass;
 } ClassCompiler;
 
 
@@ -386,7 +387,7 @@ static void call(bool canAssign)
 
 static void dot(bool canAssign)
 {
-    consume(TOKEN_IDENTIFIER, "Expect property after '.'.");
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
     uint32_t addr = identifierConstant(&parser.previous);
 
     if (canAssign && match(TOKEN_EQUAL)) {
@@ -502,6 +503,44 @@ static void variable(bool canAssign)
     namedVariable(parser.previous, canAssign);
 }
 
+static Token syntheticToken(const char* text)
+{
+    Token token;
+    token.start = text;
+    token.length = (int)strlen(text);
+    token.type = TOKEN_SYNTHETIC;
+    token.line = -1;
+
+    return token;
+}
+
+static void super_(bool canAssign)
+{
+    (void)canAssign;
+
+    if (currentClass == NULL) {
+        error("Can't use 'super' outside of a class.");
+    } else if (!currentClass->hasSuperclass) {
+        error("Can't use 'super' in a class with no superclass.");
+    }
+
+    consume(TOKEN_DOT, "Expect '.' after 'super'.");
+    consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
+    uint32_t name = identifierConstant(&parser.previous);
+
+    namedVariable(syntheticToken("this"), false);
+
+    if (match(TOKEN_LEFT_PAREN)) {
+        uint8_t argCount = argumentList();
+        namedVariable(syntheticToken("super"), false);
+        emitConstant(name, parser.previous.line, OP_SUPER_INVOKE, OP_SUPER_INVOKE_LONG);
+        emitByte(argCount);
+    } else {
+        namedVariable(syntheticToken("super"), false);
+        emitConstant(name, parser.previous.line, OP_GET_SUPER, OP_GET_SUPER_LONG);
+    }
+}
+
 static void this_(bool canAssign)
 {
     (void)canAssign;
@@ -567,7 +606,7 @@ ParseRule rules[] = {
     [TOKEN_OR] = { NULL, or_, PREC_OR },
     [TOKEN_PRINT] = { NULL, NULL, PREC_NONE },
     [TOKEN_RETURN] = { NULL, NULL, PREC_NONE },
-    [TOKEN_SUPER] = { NULL, NULL, PREC_NONE },
+    [TOKEN_SUPER] = { super_, NULL, PREC_NONE },
     [TOKEN_THIS] = { this_, NULL, PREC_NONE },
     [TOKEN_TRUE] = { literal, NULL, PREC_NONE },
     [TOKEN_VAR] = { NULL, NULL, PREC_NONE },
@@ -604,6 +643,13 @@ static uint32_t identifierConstant(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     return makeConstant(OBJ_VAL(identifier));
+}
+
+static bool identifiersEqual(Token* a, Token* b)
+{
+    if (a->length != b->length)
+        return false;
+    return memcmp(a->start, b->start, a->length) == 0;
 }
 
 static uint32_t firstOrMakeGlobal(Token* name)
@@ -830,6 +876,7 @@ static void function(FunctionType type)
 static void method()
 {
     consume(TOKEN_IDENTIFIER, "Expect method name.");
+    // TODO: use addresses instead of strings to address methods
     uint32_t constantAddr = identifierConstant(&parser.previous);
 
     FunctionType type = TYPE_METHOD;
@@ -851,8 +898,26 @@ static void classDeclaration()
     defineVariable(varAddr, true);
 
     ClassCompiler classCompiler;
+    classCompiler.hasSuperclass = false;
     classCompiler.enclosing = currentClass;
     currentClass = &classCompiler;
+
+    if (match(TOKEN_LESS)) {
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        variable(false);
+
+        if (identifiersEqual(&className, &parser.previous)) {
+            error("A class can't inherit from itself.");
+        }
+
+        beginScope();
+        addLocal(syntheticToken("super"));
+        defineVariable(0, true);
+
+        namedVariable(className, false);
+        emitByte(OP_INHERIT);
+        classCompiler.hasSuperclass = true;
+    }
 
     namedVariable(className, false);
 
@@ -862,6 +927,10 @@ static void classDeclaration()
     }
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
     emitByte(OP_POP);
+
+    if (classCompiler.hasSuperclass) {
+        endScope();
+    }
 
     currentClass = currentClass->enclosing;
 }
@@ -883,8 +952,8 @@ static void varDeclaration(bool readonly)
     } else {
         emitByte(OP_NIL);
     }
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
 
     defineVariable(addr, readonly);
 }
@@ -892,8 +961,8 @@ static void varDeclaration(bool readonly)
 static void expressionStatement()
 {
     expression();
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
     emitByte(OP_POP);
 }
 
@@ -967,8 +1036,8 @@ static void ifStatement()
 static void printStatement()
 {
     expression();
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expected ; after value.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expected ; after value.");
     emitByte(OP_PRINT);
 }
 
