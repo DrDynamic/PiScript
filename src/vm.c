@@ -265,7 +265,7 @@ void freeVM()
 static inline bool checkGlobalDefined(uint32_t addr)
 {
     return addr >= vm.globals.count
-        || (IS_OBJ(vm.globals.values[addr]) && vm.globals.values[addr].as.obj == NULL);
+        || (IS_OBJ(vm.globals.values[addr]) && AS_OBJ(vm.globals.values[addr]) == NULL);
 }
 
 static inline bool getProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
