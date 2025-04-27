@@ -2,7 +2,7 @@
 
 #include "../common.h"
 #include "chunkDefs.h"
-#include "../value.h"
+#include "../values/value.h"
 #include "sourceinfo.h"
 
 typedef enum {
@@ -60,6 +60,7 @@ typedef enum {
     OP_INHERIT,
     OP_METHOD,
     OP_METHOD_LONG,
+    OP_ARRAY_INIT,
     OP_UNDEFINED = 0xFF,
 } OpCode;
 

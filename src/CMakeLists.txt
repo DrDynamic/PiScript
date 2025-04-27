@@ -1,7 +1,7 @@
 message(STATUS "Processing src directory...")
 
-include_directories("${PROJECT_SOURCE_DIR}/src")
-include_directories("${PROJECT_SOURCE_DIR}/src/util")
+#include_directories("${PROJECT_SOURCE_DIR}/src")
+#include_directories("${PROJECT_SOURCE_DIR}/src/util")
 
 file(GLOB headers
   "${PROJECT_SOURCE_DIR}/src/*.h"

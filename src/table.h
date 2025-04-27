@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common.h"
-#include "value.h"
+#include "values/value.h"
 
 typedef struct {
     ObjString* key;

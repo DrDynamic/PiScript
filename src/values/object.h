@@ -1,11 +1,12 @@
 #pragma once
-#include "common.h"
-#include "chunk/chunk.h"
+#include "../common.h"
+#include "../chunk/chunk.h"
 #include "value.h"
-#include "table.h"
+#include "../table.h"
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
+#define IS_ARRAY(value) isObjType(value, OBJ_ARRAY)
 #define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
@@ -14,6 +15,7 @@
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 
+#define AS_ARRAY(value) ((ObjArray*)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 #define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
 #define AS_CLASS(value) ((ObjClass*)AS_OBJ(value))
@@ -24,6 +26,7 @@
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
 
 typedef enum {
+    OBJ_ARRAY,
     OBJ_BOUND_METHOD,
     OBJ_CLASS,
     OBJ_CLOSURE,
@@ -95,6 +98,12 @@ typedef struct {
     ObjClosure* method;
 } ObjBoundMethod;
 
+typedef struct {
+    Obj obj;
+    ValueArray valueArray;
+} ObjArray;
+
+ObjArray* newArray();
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);
 ObjInstance* newInstance(ObjClass* klass);
 ObjClass* newClass(ObjString* name);

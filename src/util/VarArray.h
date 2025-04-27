@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../common.h"
-#include "../object.h"
+#include "../values/object.h"
 
 
 typedef struct {

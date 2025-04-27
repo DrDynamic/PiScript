@@ -1,8 +1,8 @@
 #include <stdio.h>
 
 #include "debug.h"
-#include "../value.h"
-#include "../object.h"
+#include "../values/value.h"
+#include "../values/object.h"
 
 void disassembleChunk(Chunk* chunk, const char* name)
 {
@@ -183,6 +183,8 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return constantInstruction("OP_METHOD", chunk, offset);
     case OP_METHOD_LONG:
         return constantLongInstruction("OP_METHOD_LONG", chunk, offset);
+    case OP_ARRAY_INIT:
+        return simpleInstruction("OP_ARRAY_INIT", offset);
     case OP_CONSTANT:
         return constantInstruction("OP_CONSTANT", chunk, offset);
     case OP_CONSTANT_LONG:

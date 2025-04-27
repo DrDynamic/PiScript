@@ -1,7 +1,7 @@
 #include <time.h>
 
 #include "natives.h"
-#include "value.h"
+#include "values/value.h"
 #include "compiler.h"
 #include "util/memory.h"
 

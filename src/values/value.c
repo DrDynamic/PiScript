@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "object.h"
-#include "util/memory.h"
+#include "../util/memory.h"
 #include "value.h"
 
 void initValueArray(ValueArray* array)

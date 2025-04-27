@@ -4,7 +4,7 @@
 #include "memory.h"
 #include "../vm.h"
 #include "../compiler.h"
-#include "../value.h"
+#include "../values/value.h"
 
 #if defined(DEBUG_LOG_GC_MARK) || defined(DEBUG_LOG_GC_BLACKEN) || defined(DEBUG_LOG_GC_SWEEP)     \
     || defined(DEBUG_LOG_GC_FREE)
@@ -46,6 +46,12 @@ static void freeObject(Obj* object)
     printf("'\n");
 #endif
     switch (object->type) {
+    case OBJ_ARRAY: {
+        ObjArray* array = (ObjArray*)object;
+        freeValueArray(&array->valueArray);
+        FREE(ObjArray, object);
+        break;
+    }
     case OBJ_STRING: {
         ObjString* string = (ObjString*)object;
         FREE_ARRAY(char, string->chars, string->length + 1);
@@ -147,6 +153,11 @@ static void blackenObject(Obj* object)
     printf("\n");
 #endif
     switch (object->type) {
+    case OBJ_ARRAY: {
+        ObjArray* array = (ObjArray*)object;
+        markValueArray(&array->valueArray);
+        break;
+    }
     case OBJ_BOUND_METHOD: {
         ObjBoundMethod* bound = (ObjBoundMethod*)object;
         markValue(bound->receiver);

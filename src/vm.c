@@ -521,6 +521,11 @@ static InterpretResult run()
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_ARRAY_INIT: {
+            ObjArray* array = newArray();
+            push(OBJ_VAL(array));
+            break;
+        }
         case OP_CONSTANT: {
             uint8_t addr = READ_BYTE();
             Value constant = GET_CONSTANT(addr);

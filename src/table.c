@@ -3,9 +3,9 @@
 #include <stdio.h>
 
 #include "util/memory.h"
-#include "object.h"
+#include "values/object.h"
 #include "table.h"
-#include "value.h"
+#include "values/value.h"
 #include "vm.h"
 
 #define TABLE_MAX_LOAD 0.75

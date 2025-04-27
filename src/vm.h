@@ -1,8 +1,8 @@
 #pragma once
 
-#include "object.h"
+#include "values/object.h"
 #include "table.h"
-#include "value.h"
+#include "values/value.h"
 #include "util/VarArray.h"
 #include "util/addresstable.h"
 

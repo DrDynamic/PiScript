@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "util/memory.h"
+#include "../util/memory.h"
 #include "object.h"
-#include "table.h"
+#include "../table.h"
 #include "value.h"
-#include "vm.h"
+#include "../vm.h"
 
 #define ALLOCATE_OBJ(type, objectType) (type*)allocateObject(sizeof(type), objectType)
 
@@ -61,6 +61,11 @@ static uint32_t hashString(const char* key, int length)
         hash *= 16777619;
     }
     return hash;
+}
+
+ObjArray* newArray()
+{
+    return ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);
 }
 
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method)
@@ -165,9 +170,24 @@ static void printFunction(ObjFunction* function)
     printf("<fn %s>", function->name->chars);
 }
 
+static void printArray(ObjArray* array)
+{
+    printf("[");
+    for (unsigned int i = 0; i < array->valueArray.count; i++) {
+        printValue(array->valueArray.values[i]);
+        if (i != array->valueArray.count - 1) {
+            printf(", ");
+        }
+    }
+    printf("]");
+}
+
 void printObject(Value value)
 {
     switch (OBJ_TYPE(value)) {
+    case OBJ_ARRAY:
+        printArray(AS_ARRAY(value));
+        break;
     case OBJ_BOUND_METHOD:
         printFunction(AS_BOUND_METHOD(value)->method->function);
         break;

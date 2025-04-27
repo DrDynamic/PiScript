@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "object.h"
+#include "values/object.h"
 #include "vm.h"
 
 void defineNative(const char* name, NativeFn function);
