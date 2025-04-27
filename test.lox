@@ -1,4 +1,6 @@
-
 var a = [];
-
+a[] = "Lorem";
+a[] = "Ipsum";
+//print a[0];
+//a[0] = "Ipsum";
 print a;
