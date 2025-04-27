@@ -65,7 +65,9 @@ static uint32_t hashString(const char* key, int length)
 
 ObjArray* newArray()
 {
-    return ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);
+    ObjArray* array = ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);
+    initValueArray(&array->valueArray);
+    return array;
 }
 
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method)

@@ -185,6 +185,8 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return constantLongInstruction("OP_METHOD_LONG", chunk, offset);
     case OP_ARRAY_INIT:
         return simpleInstruction("OP_ARRAY_INIT", offset);
+    case OP_ARRAY_ADD:
+        return simpleInstruction("OP_ARRAY_ADD", offset);
     case OP_CONSTANT:
         return constantInstruction("OP_CONSTANT", chunk, offset);
     case OP_CONSTANT_LONG:

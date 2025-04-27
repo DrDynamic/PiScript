@@ -254,7 +254,7 @@ Token scanToken()
     if (isAlpha(c))
         return identifier();
 
-    // return other number formats 0xFF / .99 / o777 / etc.
+    // allow other number formats 0xFF / .99 / o777 / etc.
     if (isDigit(c))
         return number();
     switch (c) {
@@ -292,7 +292,7 @@ Token scanToken()
         return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
     case '>':
         return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
-    case '"': // TODO: support single quote strings
+    case '"': // TODO: support single quote strings / template strings
         return string();
     }
 

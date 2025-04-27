@@ -61,6 +61,7 @@ typedef enum {
     OP_METHOD,
     OP_METHOD_LONG,
     OP_ARRAY_INIT,
+    OP_ARRAY_ADD,
     OP_UNDEFINED = 0xFF,
 } OpCode;
 

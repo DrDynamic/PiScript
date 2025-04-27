@@ -402,6 +402,22 @@ static void dot(bool canAssign)
     }
 }
 
+static void bracket(bool canAssign)
+{
+    if (match(TOKEN_RIGHT_BRACKET)) {
+        // array add
+        if (!canAssign) {
+            return;
+        }
+
+        consume(TOKEN_EQUAL, "Expect '=' after array add syntax ('[]')");
+        expression();
+        emitByte(OP_ARRAY_ADD);
+    } else {
+        // property access
+    }
+}
+
 static void literal(bool canAssign)
 {
     (void)canAssign;
@@ -492,7 +508,6 @@ static void namedVariable(Token name, bool canAssign)
         setOp = OP_SET_GLOBAL;
         setOpLong = OP_SET_GLOBAL_LONG;
     }
-
     int line = parser.previous.line;
 
     if (canAssign && match(TOKEN_EQUAL)) {
@@ -585,7 +600,7 @@ ParseRule rules[] = {
     [TOKEN_RIGHT_PAREN] = { NULL, NULL, PREC_NONE },
     [TOKEN_LEFT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_RIGHT_BRACE] = { NULL, NULL, PREC_NONE },
-    [TOKEN_LEFT_BRACKET] = { array, NULL, PREC_NONE },
+    [TOKEN_LEFT_BRACKET] = { array, bracket, PREC_CALL },
     [TOKEN_RIGHT_BRACKET] = { NULL, NULL, PREC_NONE },
     [TOKEN_COMMA] = { NULL, NULL, PREC_NONE },
     [TOKEN_DOT] = { NULL, dot, PREC_CALL },

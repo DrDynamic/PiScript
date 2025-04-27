@@ -526,6 +526,17 @@ static InterpretResult run()
             push(OBJ_VAL(array));
             break;
         }
+        case OP_ARRAY_ADD: {
+            ObjArray* array = AS_ARRAY(peek(1));
+            Value value = peek(0);
+
+            writeValueArray(&array->valueArray, value);
+
+            pop();
+            pop();
+            push(value);
+            break;
+        }
         case OP_CONSTANT: {
             uint8_t addr = READ_BYTE();
             Value constant = GET_CONSTANT(addr);
