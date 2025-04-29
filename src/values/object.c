@@ -163,6 +163,44 @@ ObjUpvalue* newUpvalue(Value* slot)
     return upvalue;
 }
 
+const char* objectGet(Value receiver, Value address, Value* value)
+{
+    if (IS_ARRAY(receiver)) {
+        if (!IS_NUMBER(address)) {
+            return "Arrays index needs to be of type Number.";
+        }
+
+        ObjArray* array = AS_ARRAY(receiver);
+        uint64_t index = (uint64_t)AS_NUMBER(address);
+        if (index >= array->valueArray.count) {
+            return "Index out of bounds.";
+        }
+
+        *value = array->valueArray.values[index];
+        return NULL;
+    }
+    return "Value can not accessed with [].";
+}
+
+const char* objectSet(Value receiver, Value address, Value value)
+{
+    if (IS_ARRAY(receiver)) {
+        if (!IS_NUMBER(address)) {
+            return "Arrays index needs to be of type Number.";
+        }
+
+        ObjArray* array = AS_ARRAY(receiver);
+        uint64_t index = (uint64_t)AS_NUMBER(address);
+        if (index >= array->valueArray.count) {
+            return "Index out of bounds.";
+        }
+
+        array->valueArray.values[index] = value;
+        return NULL;
+    }
+    return "Value can not accessed with [].";
+}
+
 static void printFunction(ObjFunction* function)
 {
     if (function->name == NULL) {

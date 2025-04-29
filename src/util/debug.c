@@ -227,10 +227,14 @@ int disassembleInstruction(Chunk* chunk, int offset)
         return constantInstruction("OP_GET_PROPERTY", chunk, offset);
     case OP_GET_PROPERTY_LONG:
         return constantLongInstruction("OP_GET_PROPERTY_LONG", chunk, offset);
+    case OP_GET_PROPERTY_STACK:
+        return simpleInstruction("OP_GET_PROPERTY_STACK", offset);
     case OP_SET_PROPERTY:
         return constantInstruction("OP_SET_PROPERTY", chunk, offset);
     case OP_SET_PROPERTY_LONG:
         return constantLongInstruction("OP_SET_PROPERTY_LONG", chunk, offset);
+    case OP_SET_PROPERTY_STACK:
+        return simpleInstruction("OP_SET_PROPERTY_STACK", offset);
     case OP_GET_SUPER:
         return constantInstruction("OP_GET_SUPER", chunk, offset);
     case OP_GET_SUPER_LONG:

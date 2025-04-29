@@ -332,7 +332,7 @@ static uint32_t firstOrMakeGlobal(Token* name);
 static int resolveLocal(Compiler* compiler, Token* name);
 static void and_(bool canAssign);
 static void or_(bool canAssign);
-static uint8_t argumentList();
+static uint8_t argumentList(TokenType endToken);
 
 static void binary(bool canAssign)
 {
@@ -380,7 +380,7 @@ static void binary(bool canAssign)
 static void call(bool canAssign)
 {
     (void)canAssign;
-    uint8_t argCount = argumentList();
+    uint8_t argCount = argumentList(TOKEN_RIGHT_PAREN);
     emitByte(OP_CALL);
     emitByte(argCount);
 }
@@ -394,7 +394,7 @@ static void dot(bool canAssign)
         expression();
         emitConstant(addr, parser.previous.line, OP_SET_PROPERTY, OP_SET_PROPERTY_LONG);
     } else if (match(TOKEN_LEFT_PAREN)) {
-        uint8_t argCount = argumentList();
+        uint8_t argCount = argumentList(TOKEN_RIGHT_PAREN);
         emitConstant(addr, parser.previous.line, OP_INVOKE, OP_INVOKE_LONG);
         emitByte(argCount);
     } else {
@@ -410,11 +410,22 @@ static void bracket(bool canAssign)
             return;
         }
 
-        consume(TOKEN_EQUAL, "Expect '=' after array add syntax ('[]')");
+        consume(TOKEN_EQUAL, "Expect '=' after array add syntax ('[]').");
         expression();
         emitByte(OP_ARRAY_ADD);
     } else {
         // property access
+        expression();
+        consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array index.");
+
+        if (match(TOKEN_EQUAL)) {
+            // property set
+            expression();
+            emitByte(OP_SET_PROPERTY_STACK);
+        } else {
+            // property get
+            emitByte(OP_GET_PROPERTY_STACK);
+        }
     }
 }
 
@@ -477,8 +488,8 @@ static void array(bool canAssign)
 {
     (void)canAssign;
 
-    consume(TOKEN_RIGHT_BRACKET, "Expect ']' to end array initialization.");
-    emitByte(OP_ARRAY_INIT);
+    uint8_t argCount = argumentList(TOKEN_RIGHT_BRACKET);
+    emitBytes(OP_ARRAY_INIT, argCount);
 }
 
 static void namedVariable(Token name, bool canAssign)
@@ -554,7 +565,7 @@ static void super_(bool canAssign)
     namedVariable(syntheticToken("this"), false);
 
     if (match(TOKEN_LEFT_PAREN)) {
-        uint8_t argCount = argumentList();
+        uint8_t argCount = argumentList(TOKEN_RIGHT_PAREN);
         namedVariable(syntheticToken("super"), false);
         emitConstant(name, parser.previous.line, OP_SUPER_INVOKE, OP_SUPER_INVOKE_LONG);
         emitByte(argCount);
@@ -821,10 +832,10 @@ static void defineVariable(uint32_t addr, bool readonly)
 }
 
 
-static uint8_t argumentList()
+static uint8_t argumentList(TokenType endToken)
 {
     uint8_t argCount = 0;
-    if (!check(TOKEN_RIGHT_PAREN)) {
+    if (!check(endToken)) {
         do {
             expression();
             if (argCount == 255) {
@@ -833,7 +844,7 @@ static uint8_t argumentList()
             argCount++;
         } while (match(TOKEN_COMMA));
     }
-    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+    consume(endToken, "Expect ')' after arguments.");
     return argCount;
 }
 

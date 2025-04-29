@@ -1,6 +1,5 @@
 var a = [];
-a[] = "Lorem";
-a[] = "Ipsum";
-//print a[0];
-//a[0] = "Ipsum";
-print a;
+print []; // expect: []
+
+var b  = ["lorem", 1, true, nil];
+print b; // expect: [lorem, 1, true, nil]

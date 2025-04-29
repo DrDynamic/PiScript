@@ -203,6 +203,10 @@ static void blackenObject(Obj* object)
 
 static void markRoots()
 {
+    for (int i = 0; i < vm.tempsCount; i++) {
+        markValue(vm.temps[i]);
+    }
+
     for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
         markValue(*slot);
     }

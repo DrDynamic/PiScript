@@ -1,2 +1,5 @@
 var a = [];
 print []; // expect: []
+
+var b  = ["lorem", 1, true, nil];
+print b; // expect: [lorem, 1, true, nil]

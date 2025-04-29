@@ -6,6 +6,7 @@
 #include "util/VarArray.h"
 #include "util/addresstable.h"
 
+#define TEMPS_MAX 16
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
@@ -19,6 +20,9 @@ typedef struct {
 typedef struct {
     CallFrame frames[FRAMES_MAX];
     int frameCount;
+
+    Value temps[TEMPS_MAX];
+    int tempsCount;
 
     Value stack[STACK_MAX];
     Value* stackTop;

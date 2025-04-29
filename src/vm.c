@@ -54,8 +54,15 @@ void push(Value value)
 
 Value pop()
 {
-    // TODO: chack for stack underflow?
+    // TODO: check for stack underflow?
     vm.stackTop--;
+    return *vm.stackTop;
+}
+
+Value popN(int count)
+{
+    // TODO: check for stack underflow?
+    vm.stackTop = vm.stackTop - count;
     return *vm.stackTop;
 }
 
@@ -231,6 +238,8 @@ static void concatinate()
 
 void initVM()
 {
+    vm.tempsCount = 0;
+
     resetStack();
     vm.objects = NULL;
 
@@ -253,6 +262,8 @@ void initVM()
 
 void freeVM()
 {
+    vm.tempsCount = 0;
+
     freeValueArray(&vm.globals);
     freeTable(&vm.strings);
     freeObjects();
@@ -522,8 +533,19 @@ static InterpretResult run()
             break;
         }
         case OP_ARRAY_INIT: {
+            uint8_t argCount = READ_BYTE();
             ObjArray* array = newArray();
+            vm.temps[vm.tempsCount++] = OBJ_VAL(array);
+
+            for (int i = argCount - 1; i >= 0; i--) {
+                Value value = peek(i);
+                writeValueArray(&array->valueArray, value);
+            }
+            popN(argCount);
+
             push(OBJ_VAL(array));
+
+            vm.tempsCount--;
             break;
         }
         case OP_ARRAY_ADD: {
@@ -660,6 +682,47 @@ static InterpretResult run()
         case OP_GET_PROPERTY_LONG: {
             uint32_t propAddr = READ_UINT24();
             if (!getProperty(frame, peek(0), propAddr)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_PROPERTY_STACK: {
+            Value receiver = peek(1);
+            Value address = peek(0);
+
+            if (IS_OBJ(receiver)) {
+                Value value;
+                const char* error = objectGet(receiver, address, &value);
+                if (error != NULL) {
+                    runtimeError(error);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                pop();
+                pop();
+                push(value);
+            } else {
+                runtimeError("Value can not accessed with [].");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY_STACK: {
+            Value receiver = peek(2);
+            Value address = peek(1);
+            Value value = peek(0);
+
+            if (IS_OBJ(receiver)) {
+                const char* error = objectSet(receiver, address, value);
+                if (error != NULL) {
+                    runtimeError(error);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                pop();
+                pop();
+                pop();
+                push(value);
+            } else {
+                runtimeError("Value can not accessed with [].");
                 return INTERPRET_RUNTIME_ERROR;
             }
             break;
