@@ -1,0 +1,19 @@
+var a = [];
+
+a[] = "one";
+a[] = "two";
+a[] = "three";
+
+var index = 1;
+
+print a[index]; // expect: two
+
+fun getIndex() {
+    return 2;
+}
+
+print a[getIndex()]; // expect: three
+
+a[index] = "one";
+a[getIndex()] = "two";
+print a; // expect: [one, one, two]
