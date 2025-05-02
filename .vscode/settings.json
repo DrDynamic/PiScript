@@ -16,6 +16,7 @@
         "compiler.h": "c",
         "scanner.h": "c",
         "debug.h": "c",
+        "addresstable.h": "c",
         "object.h": "c",
         "integerarray.h": "c"
     }

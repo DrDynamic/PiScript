@@ -2,7 +2,7 @@
 
 #include "../common.h"
 #include "chunkDefs.h"
-#include "../value.h"
+#include "../values/value.h"
 #include "sourceinfo.h"
 
 typedef enum {
@@ -24,6 +24,14 @@ typedef enum {
     OP_SET_GLOBAL_LONG,
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,
+    OP_GET_PROPERTY,
+    OP_GET_PROPERTY_LONG,
+    OP_GET_PROPERTY_STACK,
+    OP_SET_PROPERTY,
+    OP_SET_PROPERTY_LONG,
+    OP_SET_PROPERTY_STACK,
+    OP_GET_SUPER,
+    OP_GET_SUPER_LONG,
     OP_EQUAL,
     OP_NOT_EQUAL,
     OP_GREATER,
@@ -41,10 +49,21 @@ typedef enum {
     OP_JUMP_IF_FALSE,
     OP_LOOP,
     OP_CALL,
+    OP_INVOKE,
+    OP_INVOKE_LONG,
+    OP_SUPER_INVOKE,
+    OP_SUPER_INVOKE_LONG,
     OP_CLOSURE,
     OP_CLOSURE_LONG,
     OP_CLOSE_UPVALUE,
     OP_RETURN,
+    OP_CLASS,
+    OP_CLASS_LONG,
+    OP_INHERIT,
+    OP_METHOD,
+    OP_METHOD_LONG,
+    OP_ARRAY_INIT,
+    OP_ARRAY_ADD,
     OP_UNDEFINED = 0xFF,
 } OpCode;
 

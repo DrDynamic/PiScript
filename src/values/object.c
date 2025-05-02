@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "util/memory.h"
+#include "../util/memory.h"
 #include "object.h"
-#include "table.h"
+#include "../table.h"
 #include "value.h"
-#include "vm.h"
+#include "../vm.h"
 
 #define ALLOCATE_OBJ(type, objectType) (type*)allocateObject(sizeof(type), objectType)
 
@@ -14,9 +14,15 @@ static Obj* allocateObject(size_t size, ObjType type)
 {
     Obj* object = (Obj*)reallocate(NULL, 0, size);
     object->type = type;
+    object->isMarked = false;
 
     object->next = vm.objects;
     vm.objects = object;
+
+#ifdef DEBUG_LOG_GC
+    printf("%p allocate %zu for %d\n", (void*)object, size, type);
+#endif
+
     return object;
 }
 
@@ -40,7 +46,10 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash)
     string->length = length;
     string->chars = chars;
     string->hash = hash;
+
+    push(OBJ_VAL(string));
     tableSet(&vm.strings, string, NIL_VAL);
+    pop();
     return string;
 }
 
@@ -52,6 +61,37 @@ static uint32_t hashString(const char* key, int length)
         hash *= 16777619;
     }
     return hash;
+}
+
+ObjArray* newArray()
+{
+    ObjArray* array = ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);
+    initValueArray(&array->valueArray);
+    return array;
+}
+
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method)
+{
+    ObjBoundMethod* bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+    bound->receiver = receiver;
+    bound->method = method;
+    return bound;
+}
+
+ObjInstance* newInstance(ObjClass* klass)
+{
+    ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+    instance->klass = klass;
+    initTable(&instance->fields);
+    return instance;
+}
+
+ObjClass* newClass(ObjString* name)
+{
+    ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    klass->name = name;
+    initTable(&klass->methods);
+    return klass;
 }
 
 ObjClosure* newClosure(ObjFunction* function)
@@ -123,6 +163,44 @@ ObjUpvalue* newUpvalue(Value* slot)
     return upvalue;
 }
 
+const char* objectGet(Value receiver, Value address, Value* value)
+{
+    if (IS_ARRAY(receiver)) {
+        if (!IS_NUMBER(address)) {
+            return "Arrays index needs to be of type Number.";
+        }
+
+        ObjArray* array = AS_ARRAY(receiver);
+        uint64_t index = (uint64_t)AS_NUMBER(address);
+        if (index >= array->valueArray.count) {
+            return "Index out of bounds.";
+        }
+
+        *value = array->valueArray.values[index];
+        return NULL;
+    }
+    return "Value can not accessed with [].";
+}
+
+const char* objectSet(Value receiver, Value address, Value value)
+{
+    if (IS_ARRAY(receiver)) {
+        if (!IS_NUMBER(address)) {
+            return "Arrays index needs to be of type Number.";
+        }
+
+        ObjArray* array = AS_ARRAY(receiver);
+        uint64_t index = (uint64_t)AS_NUMBER(address);
+        if (index >= array->valueArray.count) {
+            return "Index out of bounds.";
+        }
+
+        array->valueArray.values[index] = value;
+        return NULL;
+    }
+    return "Value can not accessed with [].";
+}
+
 static void printFunction(ObjFunction* function)
 {
     if (function->name == NULL) {
@@ -132,9 +210,33 @@ static void printFunction(ObjFunction* function)
     printf("<fn %s>", function->name->chars);
 }
 
+static void printArray(ObjArray* array)
+{
+    printf("[");
+    for (unsigned int i = 0; i < array->valueArray.count; i++) {
+        printValue(array->valueArray.values[i]);
+        if (i != array->valueArray.count - 1) {
+            printf(", ");
+        }
+    }
+    printf("]");
+}
+
 void printObject(Value value)
 {
     switch (OBJ_TYPE(value)) {
+    case OBJ_ARRAY:
+        printArray(AS_ARRAY(value));
+        break;
+    case OBJ_BOUND_METHOD:
+        printFunction(AS_BOUND_METHOD(value)->method->function);
+        break;
+    case OBJ_INSTANCE:
+        printf("<obj %s>", AS_INSTANCE(value)->klass->name->chars);
+        break;
+    case OBJ_CLASS:
+        printf("<cls %s>", AS_CLASS(value)->name->chars);
+        break;
     case OBJ_CLOSURE:
         printFunction(AS_CLOSURE(value)->function);
         break;

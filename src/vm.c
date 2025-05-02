@@ -5,9 +5,9 @@
 #include "common.h"
 #include "vm.h"
 #include "compiler.h"
-#include "debug.h"
-#include "object.h"
-#include "memory.h"
+#include "util/debug.h"
+// #include "object.h"
+#include "util/memory.h"
 #include "natives.h"
 
 VM vm;
@@ -54,8 +54,15 @@ void push(Value value)
 
 Value pop()
 {
-    // TODO: chack for stack underflow?
+    // TODO: check for stack underflow?
     vm.stackTop--;
+    return *vm.stackTop;
+}
+
+Value popN(int count)
+{
+    // TODO: check for stack underflow?
+    vm.stackTop = vm.stackTop - count;
     return *vm.stackTop;
 }
 
@@ -85,6 +92,23 @@ static bool callValue(Value callee, int argCount)
 {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+        case OBJ_BOUND_METHOD: {
+            ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
+            vm.stackTop[-argCount - 1] = bound->receiver;
+            return call(bound->method, argCount);
+        }
+        case OBJ_CLASS: {
+            ObjClass* klass = AS_CLASS(callee);
+            vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+            Value initializer;
+            if (tableGet(&klass->methods, vm.initString, &initializer)) {
+                return call(AS_CLOSURE(initializer), argCount);
+            } else if (argCount != 0) {
+                runtimeError("Expected 0 arguments but got %d.", argCount);
+                return false;
+            }
+            return true;
+        }
         case OBJ_CLOSURE:
             return call(AS_CLOSURE(callee), argCount);
         case OBJ_NATIVE: {
@@ -101,6 +125,50 @@ static bool callValue(Value callee, int argCount)
     }
     runtimeError("Can only call functions and classes.");
     return false;
+}
+
+static bool invokeFromClass(ObjClass* klass, ObjString* name, uint8_t argCount)
+{
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+
+    return call(AS_CLOSURE(method), argCount);
+}
+static bool invoke(ObjString* name, uint8_t argCount)
+{
+    Value receiver = peek(argCount);
+
+    if (!IS_INSTANCE(receiver)) {
+        runtimeError("Only instances have methods.");
+        return false;
+    }
+
+    ObjInstance* instance = AS_INSTANCE(receiver);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        vm.stackTop[-argCount - 1] = value;
+        return callValue(value, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+}
+
+static bool bindMethod(ObjClass* klass, ObjString* name)
+{
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+
+    ObjBoundMethod* bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+    pop();
+    push(OBJ_VAL(bound));
+    return true;
 }
 
 static ObjUpvalue* captureUpvalue(Value* local)
@@ -136,6 +204,14 @@ static void closeUpvalues(Value* last)
     }
 }
 
+static void defineMethod(ObjString* name)
+{
+    Value method = peek(0);
+    ObjClass* klass = AS_CLASS(peek(1));
+    tableSet(&klass->methods, name, method);
+    pop();
+}
+
 static bool isFalsey(Value value)
 {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
@@ -143,8 +219,8 @@ static bool isFalsey(Value value)
 
 static void concatinate()
 {
-    const ObjString* b = AS_STRING(pop());
-    const ObjString* a = AS_STRING(pop());
+    const ObjString* b = AS_STRING(peek(0));
+    const ObjString* a = AS_STRING(peek(1));
 
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
@@ -153,38 +229,89 @@ static void concatinate()
     chars[length] = '\0';
 
     ObjString* result = takeString(chars, length);
+
+    pop();
+    pop();
+
     push(OBJ_VAL(result));
 }
 
 void initVM()
 {
+    vm.tempsCount = 0;
+
     resetStack();
     vm.objects = NULL;
+
+    vm.bytesAllocated = 0;
+    vm.nextGC = 1024 * 1024;
+    vm.grayCapacity = 0;
+    vm.grayCount = 0;
+    vm.grayStack = NULL;
+
     initValueArray(&vm.globals);
     initTable(&vm.strings);
 
-    initTable(&vm.globalAddresses);
-    initVarArray(&vm.globalProps);
-    vm.globalCount = 0;
+    initAddressTable(&vm.gloablsTable);
+
+    vm.initString = NULL;
+    vm.initString = copyString("init", 4);
 
     defineNatives();
 }
 
 void freeVM()
 {
+    vm.tempsCount = 0;
+
     freeValueArray(&vm.globals);
     freeTable(&vm.strings);
     freeObjects();
 
-    freeTable(&vm.globalAddresses);
-    freeVarArray(&vm.globalProps);
-    vm.globalCount = 0;
+    freeAddressTable(&vm.gloablsTable);
+
+    vm.initString = NULL;
 }
 
 static inline bool checkGlobalDefined(uint32_t addr)
 {
     return addr >= vm.globals.count
-        || (IS_OBJ(vm.globals.values[addr]) && vm.globals.values[addr].as.obj == NULL);
+        || (IS_OBJ(vm.globals.values[addr]) && AS_OBJ(vm.globals.values[addr]) == NULL);
+}
+
+static inline bool getProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
+{
+    if (!IS_INSTANCE(instanceValue)) {
+        runtimeError("Only instances have properties.");
+        return false;
+    }
+    ObjInstance* instance = AS_INSTANCE(instanceValue);
+    ObjString* name = AS_STRING(frame->closure->function->chunk.constants.values[propertyAddr]);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        pop();
+        push(value);
+        return true;
+    }
+
+    return bindMethod(instance->klass, name);
+}
+
+static inline bool setProperty(CallFrame* frame, Value instanceValue, uint32_t propertyAddr)
+{
+    if (!IS_INSTANCE(instanceValue)) {
+        runtimeError("Only instances have fields.");
+        return false;
+    }
+    ObjString* propName = AS_STRING(frame->closure->function->chunk.constants.values[propertyAddr]);
+
+    ObjInstance* instance = AS_INSTANCE(instanceValue);
+    tableSet(&instance->fields, propName, peek(0));
+    Value value = pop();
+    pop();
+    push(value);
+    return true;
 }
 
 static InterpretResult run()
@@ -286,6 +413,82 @@ static InterpretResult run()
             frame = &vm.frames[vm.frameCount - 1];
             break;
         }
+        case OP_INVOKE: {
+            uint32_t addr = READ_BYTE();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            if (!invoke(method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_INVOKE_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            if (!invoke(method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_SUPER_INVOKE: {
+            uint32_t addr = READ_BYTE();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_SUPER_INVOKE_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* method = GET_STRING(addr);
+            uint8_t argCount = READ_BYTE();
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!invokeFromClass(superclass, method, argCount)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_CLASS: {
+            uint32_t addr = READ_BYTE();
+            push(OBJ_VAL(newClass(GET_STRING(addr))));
+            break;
+        }
+        case OP_CLASS_LONG: {
+            uint32_t addr = READ_UINT24();
+            push(OBJ_VAL(newClass(GET_STRING(addr))));
+            break;
+        }
+        case OP_INHERIT: {
+            Value superclass = peek(1);
+            if (!IS_CLASS(superclass)) {
+                runtimeError("Superclass must be a class.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            ObjClass* subClass = AS_CLASS(peek(0));
+            tableAddAll(&AS_CLASS(superclass)->methods, &subClass->methods);
+            pop();
+
+            break;
+        }
+        case OP_METHOD: {
+            uint32_t addr = READ_BYTE();
+            defineMethod(GET_STRING(addr));
+            break;
+        }
+        case OP_METHOD_LONG: {
+            uint32_t addr = READ_UINT24();
+            defineMethod(GET_STRING(addr));
+            break;
+        }
         case OP_CLOSURE: {
             uint8_t addr = READ_BYTE();
             Value constant = GET_CONSTANT(addr);
@@ -327,6 +530,33 @@ static InterpretResult run()
             vm.stackTop = frame->slots;
             push(result);
             frame = &vm.frames[vm.frameCount - 1];
+            break;
+        }
+        case OP_ARRAY_INIT: {
+            uint8_t argCount = READ_BYTE();
+            ObjArray* array = newArray();
+            vm.temps[vm.tempsCount++] = OBJ_VAL(array);
+
+            for (int i = argCount - 1; i >= 0; i--) {
+                Value value = peek(i);
+                writeValueArray(&array->valueArray, value);
+            }
+            popN(argCount);
+
+            push(OBJ_VAL(array));
+
+            vm.tempsCount--;
+            break;
+        }
+        case OP_ARRAY_ADD: {
+            ObjArray* array = AS_ARRAY(peek(1));
+            Value value = peek(0);
+
+            writeValueArray(&array->valueArray, value);
+
+            pop();
+            pop();
+            push(value);
             break;
         }
         case OP_CONSTANT: {
@@ -376,7 +606,8 @@ static InterpretResult run()
         case OP_GET_GLOBAL: {
             uint32_t addr = READ_BYTE();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             push(vm.globals.values[addr]);
@@ -385,7 +616,8 @@ static InterpretResult run()
         case OP_GET_GLOBAL_LONG: {
             uint32_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             push(vm.globals.values[addr]);
@@ -412,7 +644,8 @@ static InterpretResult run()
         case OP_SET_GLOBAL: {
             uint8_t addr = READ_BYTE();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             vm.globals.values[addr] = peek(0);
@@ -421,7 +654,8 @@ static InterpretResult run()
         case OP_SET_GLOBAL_LONG: {
             uint8_t addr = READ_UINT24();
             if (checkGlobalDefined(addr)) {
-                runtimeError("Undefined variable.");
+                ObjString* name = addresstableGetName(&vm.gloablsTable, addr);
+                runtimeError("Undefined variable '%s'.", name->chars);
                 return INTERPRET_RUNTIME_ERROR;
             }
             vm.globals.values[addr] = peek(0);
@@ -435,6 +669,98 @@ static InterpretResult run()
         case OP_SET_UPVALUE: {
             uint8_t slot = READ_BYTE();
             *frame->closure->upvalues[slot]->location = peek(0);
+            break;
+        }
+        case OP_GET_PROPERTY: {
+            uint32_t propAddr = READ_BYTE();
+
+            if (!getProperty(frame, peek(0), propAddr)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_PROPERTY_LONG: {
+            uint32_t propAddr = READ_UINT24();
+            if (!getProperty(frame, peek(0), propAddr)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_PROPERTY_STACK: {
+            Value receiver = peek(1);
+            Value address = peek(0);
+
+            if (IS_OBJ(receiver)) {
+                Value value;
+                const char* error = objectGet(receiver, address, &value);
+                if (error != NULL) {
+                    runtimeError(error);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                pop();
+                pop();
+                push(value);
+            } else {
+                runtimeError("Value can not accessed with [].");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY_STACK: {
+            Value receiver = peek(2);
+            Value address = peek(1);
+            Value value = peek(0);
+
+            if (IS_OBJ(receiver)) {
+                const char* error = objectSet(receiver, address, value);
+                if (error != NULL) {
+                    runtimeError(error);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                pop();
+                pop();
+                pop();
+                push(value);
+            } else {
+                runtimeError("Value can not accessed with [].");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY: {
+            uint32_t propAddr = READ_BYTE();
+            if (!setProperty(frame, peek(1), propAddr)) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY_LONG: {
+            uint32_t propAddr = READ_UINT24();
+            if (!setProperty(frame, peek(1), propAddr)) {
+                runtimeError("Only instances have fields.");
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_SUPER: {
+            uint32_t addr = READ_BYTE();
+            ObjString* name = GET_STRING(addr);
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            break;
+        }
+        case OP_GET_SUPER_LONG: {
+            uint32_t addr = READ_UINT24();
+            ObjString* name = GET_STRING(addr);
+            ObjClass* superclass = AS_CLASS(pop());
+
+            if (!bindMethod(superclass, name)) {
+                return INTERPRET_RUNTIME_ERROR;
+            }
             break;
         }
         case OP_EQUAL: {

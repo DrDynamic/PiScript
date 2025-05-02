@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../common.h"
-#include "../object.h"
+#include "../values/object.h"
 
 
 typedef struct {
@@ -23,3 +23,4 @@ void writeVarArray(VarArray* array, Var local);
 void freeVarArray(VarArray* array);
 
 void printVarArray(VarArray* array, const char* title, ...);
+void markVarArray(VarArray* array);

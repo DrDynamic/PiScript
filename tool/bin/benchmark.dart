@@ -9,7 +9,7 @@ void main(List<String> arguments) {
     exit(1);
   }
 
-  var interpreters = ['build/clox'];
+  var interpreters = ['build/src/pit'];
   var benchmark = arguments.last;
   if (arguments.length > 1) {
     interpreters = arguments.sublist(0, arguments.length - 1);
@@ -39,7 +39,7 @@ void runBenchmark(String interpreter, String benchmark) {
 /// Runs the benchmark once and returns the elapsed time.
 double runTrial(String interpreter, String benchmark) {
   var result = Process.runSync(
-      interpreter, [p.join("test", "benchmark", "$benchmark.lox")]);
+      interpreter, [p.join("language-tests", "benchmark", "$benchmark.lox")]);
   var outLines = const LineSplitter().convert(result.stdout as String);
 
   // Remove the trailing last empty line.
@@ -56,19 +56,19 @@ void runComparison(List<String> interpreters, String benchmark) {
   for (;;) {
     for (var interpreter in interpreters) {
       var elapsed = runTrial(interpreter, benchmark);
-      if (elapsed < best[interpreter]) best[interpreter] = elapsed;
+      if (elapsed < best[interpreter]!) best[interpreter] = elapsed;
     }
 
     var bestTime = 999.0;
     var worstTime = 0.0;
-    String bestInterpreter;
+    String? bestInterpreter;
     for (var interpreter in interpreters) {
-      if (best[interpreter] < bestTime) {
-        bestTime = best[interpreter];
+      if (best[interpreter]! < bestTime) {
+        bestTime = best[interpreter]!;
         bestInterpreter = interpreter;
       }
-      if (best[interpreter] > worstTime) {
-        worstTime = best[interpreter];
+      if (best[interpreter]! > worstTime) {
+        worstTime = best[interpreter]!;
       }
     }
 
@@ -80,15 +80,15 @@ void runComparison(List<String> interpreters, String benchmark) {
     for (var interpreter in interpreters) {
       String suffix;
       if (interpreter == bestInterpreter) {
-        var bestWork = 1.0 / best[interpreter];
+        var bestWork = 1.0 / best[interpreter]!;
         var workRatio = bestWork / worstWork;
         var faster = 100 * (workRatio - 1.0);
         suffix = "${faster.toStringAsFixed(4)}% faster";
       } else {
-        var ratio = best[interpreter] / bestTime;
+        var ratio = best[interpreter]! / bestTime;
         suffix = "${ratio.toStringAsFixed(4)}x time of best";
       }
-      var bestString = best[interpreter].toStringAsFixed(4);
+      var bestString = best[interpreter]!.toStringAsFixed(4);
       print("  ${interpreter.padRight(30)}   best ${bestString}s  $suffix");
     }
 

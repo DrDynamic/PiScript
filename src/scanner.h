@@ -8,6 +8,8 @@ typedef enum {
     TOKEN_RIGHT_PAREN,
     TOKEN_LEFT_BRACE,
     TOKEN_RIGHT_BRACE,
+    TOKEN_LEFT_BRACKET,
+    TOKEN_RIGHT_BRACKET,
     TOKEN_COMMA,
     TOKEN_DOT,
     TOKEN_MINUS,
@@ -47,6 +49,7 @@ typedef enum {
     TOKEN_CONST,
     TOKEN_WHILE,
 
+    TOKEN_SYNTHETIC,
     TOKEN_ERROR,
     TOKEN_EOF
 } TokenType;

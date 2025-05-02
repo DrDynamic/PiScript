@@ -3,15 +3,20 @@
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-	"settings": {
-		"editor.formatOnSave": true,
-		"editor.formatOnPaste": true,
-		"C_Cpp.clang_format_sortIncludes": false
-	},
-	"extensions": [
-		"ms-vscode.cpptools",
-		"twxs.cmake",
-		"cschlosser.doxdocgen",
-		"spmeesseman.vscode-taskexplorer"
-	]
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools",
+				"twxs.cmake",
+				"cschlosser.doxdocgen",
+				"spmeesseman.vscode-taskexplorer",
+				"ms-vscode.cpptools-extension-pack"
+			],
+			"settings": {
+				"editor.formatOnSave": true,
+				"editor.formatOnPaste": true,
+				"C_Cpp.clang_format_sortIncludes": false
+			}
+		}
+	}
 }

@@ -17,7 +17,7 @@
 #include <stdlib.h>
 
 #include "test.h"
-#include "value.h"
+#include "values/value.h"
 
 /**
  * redifinitions / wrapping

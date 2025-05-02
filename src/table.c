@@ -3,9 +3,9 @@
 #include <stdio.h>
 
 #include "util/memory.h"
-#include "object.h"
+#include "values/object.h"
 #include "table.h"
-#include "value.h"
+#include "values/value.h"
 #include "vm.h"
 
 #define TABLE_MAX_LOAD 0.75
@@ -25,7 +25,7 @@ void freeTable(Table* table)
 
 static Entry* findEntry(Entry* entries, int capacity, ObjString* key)
 {
-    uint32_t index = key->hash % capacity;
+    uint32_t index = key->hash & (capacity - 1);
     Entry* tombstone = NULL;
 
     for (;;) {
@@ -45,7 +45,7 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key)
             return entry;
         }
 
-        index = (index + 1) % capacity;
+        index = (index + 1) & (capacity - 1);
     }
 }
 
@@ -118,16 +118,7 @@ bool tableGetUint32(Table* table, ObjString* key, uint32_t* value)
     if (table->count == 0) {
         return false;
     }
-    /*
-        printf("== tableGetUiclea &table->entries[i];
-            if (entry->key == NULL) {
-                printf("  [%d] NULL = '%d'\n", i, entry->as.uint32);
-            } else {
-                printf("  [%d] %s = '%d'\n", i, entry->key->chars, entry->as.uint32);
-            }
-        }
-        printf("==================\n");
-    */
+
     Entry* entry = findEntry(table->entries, table->capacity, key);
     if (entry->key == NULL) {
         return false;
@@ -190,7 +181,7 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
         return NULL;
     }
 
-    uint32_t index = hash % table->capacity;
+    uint32_t index = hash & (table->capacity - 1);
     for (;;) {
         Entry* entry = &table->entries[index];
         if (entry->key == NULL) {
@@ -203,6 +194,25 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
             return entry->key;
         }
 
-        index = (index + 1) % table->capacity;
+        index = (index + 1) & (table->capacity - 1);
+    }
+}
+
+void tableRemoveWhite(Table* table)
+{
+    for (int i = 0; i < table->capacity; i++) {
+        Entry* entry = &table->entries[i];
+        if (entry->key != NULL && !entry->key->obj.isMarked) {
+            tableDelete(table, entry->key);
+        }
+    }
+}
+
+void markTable(Table* table)
+{
+    for (int i = 0; i < table->capacity; i++) {
+        Entry* entry = &table->entries[i];
+        markObject((Obj*)entry->key);
+        markValue(entry->as.value);
     }
 }

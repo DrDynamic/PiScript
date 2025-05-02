@@ -7,6 +7,8 @@ https://github.com/Dinesh21Kumar/gtest-example/blob/master/CMakeLists.txt
 - define syntax
 - define features
 - define integration tests (code samples)
+- refine repl
+- add generational gc
 
 # Features
 ## values

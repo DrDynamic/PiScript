@@ -5,7 +5,9 @@
 #include "common.h"
 #include "compiler.h"
 #include "scanner.h"
+#include "util/addresstable.h"
 #include "util/VarArray.h"
+#include "util/memory.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
@@ -40,7 +42,12 @@ typedef struct {
     Precedence precedence;
 } ParseRule;
 
-typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
+typedef enum {
+    TYPE_FUNCTION,
+    TYPE_INITIALIZER,
+    TYPE_METHOD,
+    TYPE_SCRIPT,
+} FunctionType;
 
 typedef struct {
     uint8_t index;
@@ -54,17 +61,22 @@ typedef struct Compiler {
     ObjFunction* function;
     FunctionType type;
 
-    Table localNames;
-    VarArray localProps;
+    AddressTable locals;
 
     Upvalue upvalues[UINT8_COUNT];
 
     int scopeDepth;
 } Compiler;
 
+typedef struct ClassCompiler {
+    struct ClassCompiler* enclosing;
+    bool hasSuperclass;
+} ClassCompiler;
+
+
 Parser parser;
 Compiler* current = NULL;
-
+ClassCompiler* currentClass = NULL;
 static Chunk* currentChunk()
 {
     return &current->function->chunk;
@@ -143,13 +155,13 @@ static void emitByte(uint8_t byte)
     writeChunk(currentChunk(), byte, parser.previous.line);
 }
 
-/*
+
 static void emitBytes(uint8_t byte1, uint8_t byte2)
 {
     emitByte(byte1);
     emitByte(byte2);
 }
-*/
+
 
 static void emitLoop(int loopStart)
 {
@@ -175,7 +187,11 @@ static int emitJump(uint8_t instruction)
 
 static void emitReturn()
 {
-    emitByte(OP_NIL);
+    if (current->type == TYPE_INITIALIZER) {
+        emitBytes(OP_GET_LOCAL, 0);
+    } else {
+        emitByte(OP_NIL);
+    }
     emitByte(OP_RETURN);
 }
 
@@ -219,8 +235,7 @@ static void initCompiler(Compiler* compiler, FunctionType type)
     compiler->function = NULL;
     compiler->type = type;
 
-    initTable(&compiler->localNames);
-    initVarArray(&compiler->localProps);
+    initAddressTable(&compiler->locals);
 
     compiler->scopeDepth = 0;
     compiler->function = newFunction();
@@ -230,22 +245,41 @@ static void initCompiler(Compiler* compiler, FunctionType type)
         current->function->name = copyString(parser.previous.start, parser.previous.length);
     }
 
-    writeVarArray(&current->localProps,
-        (Var) {
-            .depth = -1,
-            .identifier = NULL,
-            .shadowAddr = -1,
-            .readonly = true,
-            .isCaptured = false,
-        });
+    if (type != TYPE_FUNCTION) {
+        // if (type == TYPE_METHOD) {
+        ObjString* identifier = copyString("this", 4);
+        push(OBJ_VAL(identifier));
+
+        addresstableAdd(&current->locals, identifier,
+            (Var) {
+                .depth = 0,
+                .identifier = identifier,
+                .shadowAddr = -1,
+                .readonly = true,
+                .isCaptured = false,
+            });
+
+        pop();
+    } else {
+        ObjString* identifier = copyString("", 0);
+        push(OBJ_VAL(identifier));
+
+        addresstableAdd(&current->locals, identifier,
+            (Var) {
+                .depth = -1,
+                .identifier = NULL,
+                .shadowAddr = -1,
+                .readonly = true,
+                .isCaptured = false,
+            });
+
+        pop();
+    }
 }
 
 static void freeCompiler(Compiler* compiler)
 {
-    freeTable(&compiler->localNames);
-    freeVarArray(&compiler->localProps);
-
-    initCompiler(compiler, TYPE_SCRIPT);
+    freeAddressTable(&compiler->locals);
 }
 
 static ObjFunction* endCompiler()
@@ -258,9 +292,9 @@ static ObjFunction* endCompiler()
             currentChunk(), function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
-    // TODO: fix memory leak
-    //    freeCompiler(current);
-    current = current->enclosing;
+    Compiler* enclosing = current->enclosing;
+    freeCompiler(current);
+    current = enclosing;
     return function;
 }
 
@@ -273,22 +307,17 @@ static void endScope()
 {
     current->scopeDepth--;
 
-    while (current->localProps.count > 0
-        && current->localProps.values[current->localProps.count - 1].depth > current->scopeDepth) {
+    AddressTable* locals = &current->locals;
+    while (!addresstableIsEmpty(locals)
+        && addresstableGetLastProps(locals)->depth > current->scopeDepth) {
+        Var* local = addresstableGetLastProps(locals);
+        addresstablePop(locals);
 
-        Var* local = &current->localProps.values[current->localProps.count - 1];
-        if (local->shadowAddr != -1) {
-            tableSetUint32(&current->localNames, local->identifier, local->shadowAddr);
-        } else {
-            tableDelete(&current->localNames, local->identifier);
-        }
-
-        if (current->localProps.values[current->localProps.count - 1].isCaptured) {
+        if (local->isCaptured) {
             emitByte(OP_CLOSE_UPVALUE);
         } else {
             emitByte(OP_POP);
         }
-        current->localProps.count--;
     }
 }
 
@@ -299,10 +328,11 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 static uint32_t identifierConstant(Token* name);
+static uint32_t firstOrMakeGlobal(Token* name);
 static int resolveLocal(Compiler* compiler, Token* name);
 static void and_(bool canAssign);
 static void or_(bool canAssign);
-static uint8_t argumentList();
+static uint8_t argumentList(TokenType endToken);
 
 static void binary(bool canAssign)
 {
@@ -350,9 +380,53 @@ static void binary(bool canAssign)
 static void call(bool canAssign)
 {
     (void)canAssign;
-    uint8_t argCount = argumentList();
+    uint8_t argCount = argumentList(TOKEN_RIGHT_PAREN);
     emitByte(OP_CALL);
     emitByte(argCount);
+}
+
+static void dot(bool canAssign)
+{
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+    uint32_t addr = identifierConstant(&parser.previous);
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        emitConstant(addr, parser.previous.line, OP_SET_PROPERTY, OP_SET_PROPERTY_LONG);
+    } else if (match(TOKEN_LEFT_PAREN)) {
+        uint8_t argCount = argumentList(TOKEN_RIGHT_PAREN);
+        emitConstant(addr, parser.previous.line, OP_INVOKE, OP_INVOKE_LONG);
+        emitByte(argCount);
+    } else {
+        emitConstant(addr, parser.previous.line, OP_GET_PROPERTY, OP_GET_PROPERTY_LONG);
+    }
+}
+
+static void bracket(bool canAssign)
+{
+    if (match(TOKEN_RIGHT_BRACKET)) {
+        // array add
+        if (!canAssign) {
+            return;
+        }
+
+        consume(TOKEN_EQUAL, "Expect '=' after array add syntax ('[]').");
+        expression();
+        emitByte(OP_ARRAY_ADD);
+    } else {
+        // property access
+        expression();
+        consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array index.");
+
+        if (match(TOKEN_EQUAL)) {
+            // property set
+            expression();
+            emitByte(OP_SET_PROPERTY_STACK);
+        } else {
+            // property get
+            emitByte(OP_GET_PROPERTY_STACK);
+        }
+    }
 }
 
 static void literal(bool canAssign)
@@ -410,6 +484,14 @@ static void string(bool canAssign)
     emitConstant(addr, parser.previous.line, OP_CONSTANT, OP_CONSTANT_LONG);
 }
 
+static void array(bool canAssign)
+{
+    (void)canAssign;
+
+    uint8_t argCount = argumentList(TOKEN_RIGHT_BRACKET);
+    emitBytes(OP_ARRAY_INIT, argCount);
+}
+
 static void namedVariable(Token name, bool canAssign)
 {
     OpCode getOp, getOpLong, setOp, setOpLong;
@@ -417,7 +499,7 @@ static void namedVariable(Token name, bool canAssign)
     int addr = resolveLocal(current, &name);
     Var* var = NULL;
     if (addr != -1) {
-        var = &current->localProps.values[addr];
+        var = addresstableGetProps(&current->locals, addr);
 
         getOp = OP_GET_LOCAL;
         getOpLong = OP_GET_LOCAL_LONG;
@@ -429,15 +511,14 @@ static void namedVariable(Token name, bool canAssign)
         setOp = OP_SET_UPVALUE;
         setOpLong = 0xFF; // not supported
     } else {
-        addr = identifierConstant(&name);
-        var = &vm.globalProps.values[addr];
+        addr = firstOrMakeGlobal(&name);
+        var = addresstableGetProps(&vm.gloablsTable, addr);
 
         getOp = OP_GET_GLOBAL;
         getOpLong = OP_GET_GLOBAL_LONG;
         setOp = OP_SET_GLOBAL;
         setOpLong = OP_SET_GLOBAL_LONG;
     }
-
     int line = parser.previous.line;
 
     if (canAssign && match(TOKEN_EQUAL)) {
@@ -454,6 +535,55 @@ static void namedVariable(Token name, bool canAssign)
 static void variable(bool canAssign)
 {
     namedVariable(parser.previous, canAssign);
+}
+
+static Token syntheticToken(const char* text)
+{
+    Token token;
+    token.start = text;
+    token.length = (int)strlen(text);
+    token.type = TOKEN_SYNTHETIC;
+    token.line = -1;
+
+    return token;
+}
+
+static void super_(bool canAssign)
+{
+    (void)canAssign;
+
+    if (currentClass == NULL) {
+        error("Can't use 'super' outside of a class.");
+    } else if (!currentClass->hasSuperclass) {
+        error("Can't use 'super' in a class with no superclass.");
+    }
+
+    consume(TOKEN_DOT, "Expect '.' after 'super'.");
+    consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
+    uint32_t name = identifierConstant(&parser.previous);
+
+    namedVariable(syntheticToken("this"), false);
+
+    if (match(TOKEN_LEFT_PAREN)) {
+        uint8_t argCount = argumentList(TOKEN_RIGHT_PAREN);
+        namedVariable(syntheticToken("super"), false);
+        emitConstant(name, parser.previous.line, OP_SUPER_INVOKE, OP_SUPER_INVOKE_LONG);
+        emitByte(argCount);
+    } else {
+        namedVariable(syntheticToken("super"), false);
+        emitConstant(name, parser.previous.line, OP_GET_SUPER, OP_GET_SUPER_LONG);
+    }
+}
+
+static void this_(bool canAssign)
+{
+    (void)canAssign;
+
+    if (currentClass == NULL) {
+        error("Can't use 'this' outside of a class.");
+        return;
+    }
+    variable(false);
 }
 
 static void unary(bool canAssign)
@@ -481,8 +611,10 @@ ParseRule rules[] = {
     [TOKEN_RIGHT_PAREN] = { NULL, NULL, PREC_NONE },
     [TOKEN_LEFT_BRACE] = { NULL, NULL, PREC_NONE },
     [TOKEN_RIGHT_BRACE] = { NULL, NULL, PREC_NONE },
+    [TOKEN_LEFT_BRACKET] = { array, bracket, PREC_CALL },
+    [TOKEN_RIGHT_BRACKET] = { NULL, NULL, PREC_NONE },
     [TOKEN_COMMA] = { NULL, NULL, PREC_NONE },
-    [TOKEN_DOT] = { NULL, NULL, PREC_NONE },
+    [TOKEN_DOT] = { NULL, dot, PREC_CALL },
     [TOKEN_MINUS] = { unary, binary, PREC_TERM },
     [TOKEN_PLUS] = { NULL, binary, PREC_TERM },
     [TOKEN_SEMICOLON] = { NULL, NULL, PREC_NONE },
@@ -510,8 +642,8 @@ ParseRule rules[] = {
     [TOKEN_OR] = { NULL, or_, PREC_OR },
     [TOKEN_PRINT] = { NULL, NULL, PREC_NONE },
     [TOKEN_RETURN] = { NULL, NULL, PREC_NONE },
-    [TOKEN_SUPER] = { NULL, NULL, PREC_NONE },
-    [TOKEN_THIS] = { NULL, NULL, PREC_NONE },
+    [TOKEN_SUPER] = { super_, NULL, PREC_NONE },
+    [TOKEN_THIS] = { this_, NULL, PREC_NONE },
     [TOKEN_TRUE] = { literal, NULL, PREC_NONE },
     [TOKEN_VAR] = { NULL, NULL, PREC_NONE },
     [TOKEN_CONST] = { NULL, NULL, PREC_NONE },
@@ -546,14 +678,29 @@ static void parsePrecedence(Precedence precedence)
 static uint32_t identifierConstant(Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
+    return makeConstant(OBJ_VAL(identifier));
+}
+
+static bool identifiersEqual(Token* a, Token* b)
+{
+    if (a->length != b->length)
+        return false;
+    return memcmp(a->start, b->start, a->length) == 0;
+}
+
+static uint32_t firstOrMakeGlobal(Token* name)
+{
+    ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&vm.globalAddresses, identifier, &addr)) {
+    if (addresstableGetAddress(&vm.gloablsTable, identifier, &addr)) {
         return addr;
     }
 
-    addr = vm.globalCount++;
-    tableSetUint32(&vm.globalAddresses, identifier, addr);
-    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = false });
+    addr = addresstableAdd(&vm.gloablsTable, identifier,
+        (Var) {
+            .identifier = identifier,
+            .readonly = false,
+        });
 
     return addr;
 }
@@ -562,12 +709,14 @@ static int resolveLocal(Compiler* compiler, Token* name)
 {
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&compiler->localNames, identifier, &addr)) {
-        if (compiler->localProps.values[addr].depth == -1) {
+
+    if (addresstableGetAddress(&compiler->locals, identifier, &addr)) {
+        if (addresstableGetProps(&compiler->locals, addr)->depth == -1) {
             error("Can't read local variable in its own initializer.");
         }
         return addr;
     }
+
     return -1;
 }
 
@@ -601,8 +750,9 @@ static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps)
 
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
-        compiler->enclosing->localProps.values[local].isCaptured = true;
-        *varProps = &compiler->localProps.values[local];
+        addresstableGetProps(&compiler->enclosing->locals, local)->isCaptured = true;
+        *varProps = addresstableGetProps(
+            &compiler->enclosing->locals, local); // TODO: check - added enclosing
         return addUpvalue(compiler, (uint32_t)local, true, *varProps);
     }
 
@@ -617,33 +767,17 @@ static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps)
 static uint32_t addLocal(Token name)
 {
     ObjString* identifier = copyString(name.start, name.length);
+    push(OBJ_VAL(identifier));
 
-    uint32_t addr;
-    if (tableGetUint32(&current->localNames, identifier, &addr)) {
-
-        tableSetUint32(&current->localNames, identifier, current->localProps.count);
-        writeVarArray(&current->localProps,
-            (Var) {
-                .identifier = identifier,
-                .depth = -1,
-                .readonly = false,
-                .shadowAddr = addr,
-                .isCaptured = false,
-            });
-
-    } else {
-        tableSetUint32(&current->localNames, identifier, current->localProps.count);
-        writeVarArray(&current->localProps,
-            (Var) {
-                .identifier = identifier,
-                .depth = -1,
-                .readonly = false,
-                .shadowAddr = -1,
-                .isCaptured = false,
-            });
-        addr = current->localProps.count - 1;
-    }
-
+    uint32_t addr = addresstableAdd(&current->locals, identifier,
+        (Var) {
+            .identifier = identifier,
+            .depth = -1,
+            .readonly = false,
+            .shadowAddr = -1,
+            .isCaptured = false,
+        });
+    pop(); // identifier
     return addr;
 }
 
@@ -655,8 +789,8 @@ static uint32_t declareVariable()
     Token* name = &parser.previous;
     ObjString* identifier = copyString(name->start, name->length);
     uint32_t addr;
-    if (tableGetUint32(&current->localNames, identifier, &addr)) {
-        if (current->localProps.values[addr].depth == current->scopeDepth) {
+    if (addresstableGetAddress(&current->locals, identifier, &addr)) {
+        if (addresstableGetProps(&current->locals, addr)->depth == current->scopeDepth) {
             error("Already a variable with this name in this scope.");
         }
     }
@@ -674,7 +808,7 @@ static uint32_t parseVariable(const char* errorMessage)
         return localAddr;
     }
 
-    return identifierConstant(&parser.previous);
+    return firstOrMakeGlobal(&parser.previous);
 }
 
 static void markInitialized()
@@ -682,26 +816,26 @@ static void markInitialized()
     if (current->scopeDepth == 0) {
         return;
     }
-    current->localProps.values[current->localProps.count - 1].depth = current->scopeDepth;
+    addresstableGetLastProps(&current->locals)->depth = current->scopeDepth;
 }
 
 static void defineVariable(uint32_t addr, bool readonly)
 {
     if (current->scopeDepth > 0) {
         markInitialized();
-        current->localProps.values[addr].readonly = readonly;
+        addresstableGetProps(&current->locals, addr)->readonly = readonly;
         return;
     }
 
-    vm.globalProps.values[addr].readonly = readonly;
+    addresstableGetProps(&vm.gloablsTable, addr)->readonly = readonly;
     emitConstant(addr, parser.previous.line, OP_DEFINE_GLOBAL, OP_DEFINE_GLOBAL_LONG);
 }
 
 
-static uint8_t argumentList()
+static uint8_t argumentList(TokenType endToken)
 {
     uint8_t argCount = 0;
-    if (!check(TOKEN_RIGHT_PAREN)) {
+    if (!check(endToken)) {
         do {
             expression();
             if (argCount == 255) {
@@ -710,7 +844,7 @@ static uint8_t argumentList()
             argCount++;
         } while (match(TOKEN_COMMA));
     }
-    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+    consume(endToken, "Expect ')' after arguments.");
     return argCount;
 }
 
@@ -775,6 +909,68 @@ static void function(FunctionType type)
     }
 }
 
+static void method()
+{
+    consume(TOKEN_IDENTIFIER, "Expect method name.");
+    // TODO: use addresses instead of strings to address methods
+    uint32_t constantAddr = identifierConstant(&parser.previous);
+
+    FunctionType type = TYPE_METHOD;
+    if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
+        type = TYPE_INITIALIZER;
+    }
+    function(type);
+
+    emitConstant(constantAddr, parser.previous.line, OP_METHOD, OP_METHOD_LONG);
+}
+
+static void classDeclaration()
+{
+    uint32_t varAddr = parseVariable("Expect class name.");
+    Token className = parser.previous;
+    // TODO: remove name from class declaration?
+    uint32_t nameAddr = identifierConstant(&parser.previous);
+    emitConstant(nameAddr, parser.previous.line, OP_CLASS, OP_CLASS_LONG);
+    defineVariable(varAddr, true);
+
+    ClassCompiler classCompiler;
+    classCompiler.hasSuperclass = false;
+    classCompiler.enclosing = currentClass;
+    currentClass = &classCompiler;
+
+    if (match(TOKEN_LESS)) {
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        variable(false);
+
+        if (identifiersEqual(&className, &parser.previous)) {
+            error("A class can't inherit from itself.");
+        }
+
+        beginScope();
+        addLocal(syntheticToken("super"));
+        defineVariable(0, true);
+
+        namedVariable(className, false);
+        emitByte(OP_INHERIT);
+        classCompiler.hasSuperclass = true;
+    }
+
+    namedVariable(className, false);
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        method();
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+    emitByte(OP_POP);
+
+    if (classCompiler.hasSuperclass) {
+        endScope();
+    }
+
+    currentClass = currentClass->enclosing;
+}
+
 static void funDeclaration()
 {
     uint8_t addr = parseVariable("Expect function name.");
@@ -792,8 +988,8 @@ static void varDeclaration(bool readonly)
     } else {
         emitByte(OP_NIL);
     }
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
 
     defineVariable(addr, readonly);
 }
@@ -801,8 +997,8 @@ static void varDeclaration(bool readonly)
 static void expressionStatement()
 {
     expression();
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
     emitByte(OP_POP);
 }
 
@@ -876,8 +1072,8 @@ static void ifStatement()
 static void printStatement()
 {
     expression();
-    match(TOKEN_SEMICOLON);
-    //    consume(TOKEN_SEMICOLON, "Expected ; after value.");
+    // match(TOKEN_SEMICOLON);
+    consume(TOKEN_SEMICOLON, "Expected ; after value.");
     emitByte(OP_PRINT);
 }
 
@@ -890,6 +1086,9 @@ static void returnStatement()
     if (match(TOKEN_SEMICOLON)) {
         emitReturn();
     } else {
+        if (current->type == TYPE_INITIALIZER) {
+            error("Can't return a value from an initializer.");
+        }
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
         emitByte(OP_RETURN);
@@ -941,7 +1140,9 @@ static void synchronize()
 
 static void declaration()
 {
-    if (match(TOKEN_FUN)) {
+    if (match(TOKEN_CLASS)) {
+        classDeclaration();
+    } else if (match(TOKEN_FUN)) {
         funDeclaration();
     } else if (match(TOKEN_VAR)) {
         varDeclaration(false);
@@ -979,12 +1180,19 @@ static void statement()
 void defineNative(const char* name, NativeFn function)
 {
     ObjString* identifier = copyString(name, (int)strlen(name));
+    push(OBJ_VAL(identifier));
     ObjNative* native = newNative(function);
+    push(OBJ_VAL(native));
 
-    uint32_t addr = vm.globalCount++;
-    tableSetUint32(&vm.globalAddresses, identifier, addr);
-    writeVarArray(&vm.globalProps, (Var) { .identifier = identifier, .readonly = true });
+    addresstableAdd(&vm.gloablsTable, identifier,
+        (Var) {
+            .identifier = identifier,
+            .readonly = true,
+        });
     writeValueArray(&vm.globals, OBJ_VAL(native));
+
+    pop();
+    pop();
 }
 
 ObjFunction* compile(const char* source)
@@ -1004,4 +1212,14 @@ ObjFunction* compile(const char* source)
 
     ObjFunction* scriptFunction = endCompiler();
     return parser.hadError ? NULL : scriptFunction;
+}
+
+void markCompilerRoots()
+{
+    Compiler* compiler = current;
+    while (compiler != NULL) {
+        markObject((Obj*)compiler->function);
+        markTable(&compiler->locals.addresses);
+        compiler = compiler->enclosing;
+    }
 }
