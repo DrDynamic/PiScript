@@ -7,3 +7,5 @@ dependencies:
   charcode: ^1.4.0
   glob: ^2.1.3
   path: ^1.9.1
+  sass: ^1.26.5
+  shelf: ^1.4.2

@@ -10,7 +10,8 @@
 				"twxs.cmake",
 				"cschlosser.doxdocgen",
 				"spmeesseman.vscode-taskexplorer",
-				"ms-vscode.cpptools-extension-pack"
+				"ms-vscode.cpptools-extension-pack",
+				"dart-code.dart-code"
 			],
 			"settings": {
 				"editor.formatOnSave": true,
