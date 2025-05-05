@@ -3,6 +3,10 @@ WIP is similar to PHP with a sprinkle of JavaScript.
 
 
 ```wip
+
+void test () {
+  print("A");
+}
 const sys = import('system');
 
 class Greeter {

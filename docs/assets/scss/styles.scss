@@ -3,6 +3,9 @@
     border-radius: 5px;
 }
 
+$warm-dark: hsl(40, 0%, 35%);
+$warm-light: hsl(40, 30%, 97%);
+
 body {
     background-color: #EFEFEF;
     font-family: 'Source Sans 3';
@@ -107,4 +110,51 @@ pre {
     border-color: #BDBDBD; //hsl(193, 18%, 79%);
     border-width: 1px;
     background: #FAFAFA; // hsl(195, 30%, 92%);
+}
+
+.codehilite {
+    pre {
+        color: mix($warm-light, $warm-dark, 20%);
+    }
+
+    .k {
+        color: hsl(200, 100%, 45%);
+    }
+
+    // Keyword.
+    .n {
+        color: hsl(20, 70%, 55%);
+    }
+
+    // Number.
+    .s {
+        color: hsl(40, 70%, 45%);
+    }
+
+    // String.
+    .e {
+        color: hsl(45, 80%, 55%);
+    }
+
+    // String escape.
+    .c {
+        color: mix($warm-light, $warm-dark, 50%);
+    }
+
+    // Comment.
+    .a {
+        color: hsl(270, 50%, 60%);
+    }
+
+    // Preprocessor, annotation.
+    .i {
+        color: hsl(200, 70%, 35%);
+    }
+
+    // Identifier.
+    .t {
+        color: hsl(185, 100%, 35%);
+    }
+
+    // Type name.
 }

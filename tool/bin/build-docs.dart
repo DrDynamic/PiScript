@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:sass/sass.dart' as sass;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as io;
+import 'package:tool/src/code_syntax.dart';
 import 'package:tool/src/page.dart';
 import 'package:tool/src/term.dart' as term;
 
@@ -77,7 +78,11 @@ void _buildPages() {
 
 void _buildPage(Page page) {
   var mdContent = page.readMarkdown();
-  var body = markdownToHtml(mdContent);
+  var body = markdownToHtml(
+    mdContent,
+    extensionSet: ExtensionSet.gitHubFlavored,
+    blockSyntaxes: [HighlightedCodeBlockSyntax()],
+  );
 
   var data = <String, dynamic>{
     "title": page.title,
