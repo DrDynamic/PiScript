@@ -34,7 +34,9 @@ void main(List<String> arguments) async {
 }
 
 void _clearBuild() {
-  Directory(outputDir).deleteSync(recursive: true);
+  if (Directory(outputDir).existsSync()) {
+    Directory(outputDir).deleteSync(recursive: true);
+  }
 }
 
 void _copy(String path) {
