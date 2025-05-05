@@ -9,3 +9,5 @@ dependencies:
   path: ^1.9.1
   sass: ^1.26.5
   shelf: ^1.4.2
+  mime_type: ^1.0.1
+  markdown: ^7.3.0
