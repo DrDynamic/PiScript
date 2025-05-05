@@ -1,0 +1,110 @@
+@mixin card {
+    padding: 5px 15px;
+    border-radius: 5px;
+}
+
+body {
+    background-color: #EFEFEF;
+    font-family: 'Source Sans 3';
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+h1 {
+    color: #607D8B;
+}
+
+nav {
+    @include card;
+    display: flex;
+    flex-direction: column;
+    width: 200px;
+    background-color: #FFF;
+
+    img {
+        align-self: center;
+        margin: 25px 0;
+
+    }
+
+    h2 {
+        color: #607D8B;
+        font-weight: 500;
+        font-size: 1.2em;
+        margin: 10px 0 0 0;
+    }
+
+    ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+}
+
+a {
+    text-decoration: none;
+    color: #01579B;
+
+    &:hover {
+        color: #263238;
+    }
+}
+
+.divider {
+    border-style: solid;
+    border-width: thin 0px 0px;
+    display: block;
+    height: 0px;
+    max-height: 0px;
+    opacity: 0.12;
+    overflow: visible;
+    padding: 0px;
+    margin: 0px;
+    margin-block-start: 0.5em;
+    margin-block-end: 0.5em;
+}
+
+.title {
+    font-family: 'Source Code Pro';
+    font-size: 7em;
+    font-weight: bolder;
+    color: #546E7A; //#646464;
+    text-transform: uppercase;
+}
+
+.subtitle {
+    font-family: 'Source Code Pro';
+    font-size: 1.5em;
+    font-weight: bolder;
+    color: #546E7A;
+    padding-left: 50px;
+}
+
+.content {
+    @include card;
+    display: flex;
+    flex-direction: column;
+    background-color: #FFFFFF;
+    width: 800px;
+}
+
+.alert {
+    background-color: #FFECB3;
+    margin: 0 auto;
+    padding: 5px 15px;
+    width: 750px;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+pre {
+    font-family: 'Source Code Pro';
+    padding: 5px;
+
+    border-style: solid;
+    border-radius: 5px;
+    border-color: #BDBDBD; //hsl(193, 18%, 79%);
+    border-width: 1px;
+    background: #FAFAFA; // hsl(195, 30%, 92%);
+}

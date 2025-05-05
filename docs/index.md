@@ -2,9 +2,6 @@
 WIP is similar to PHP with a sprinkle of JavaScript. 
 
 
-This documentation ist a vision what WIP could be in the future. At the moment everything is subject to change. 
-
-
 ```wip
 const sys = import('system');
 
