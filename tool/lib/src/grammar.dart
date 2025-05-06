@@ -149,6 +149,7 @@ final _commonRules = [
   Rule(r"[0-9]+[Lu]?", "n"), // Integer.
 
   Rule(r"//.*", "c"), // Line comment.
+  Rule(r"/\*.*\*\/", "c"), // Line comment.
 
   // Capitalized type name.
   Rule(r"[A-Z][A-Za-z0-9_]*", "t"),
