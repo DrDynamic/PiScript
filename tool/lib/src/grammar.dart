@@ -31,6 +31,8 @@ final wip = Language(
     // rule.
     Rule(r"[A-Z][A-Z0-9_]+\b", "i"),
 
+    BlockCommentRule(r"\/\*", r"\*\/", "c"),
+
     ..._commonRules,
     _characterRule,
   ],
@@ -142,14 +144,15 @@ final _cRules = [
 final _characterRule = Rule(r"'\\?.'", "s");
 
 final _commonRules = [
-  StringRule(),
+  StringRule('"'),
+  StringRule("'"),
 
   Rule(r"[0-9]+\.[0-9]+f?", "n"), // Float.
   Rule(r"0x[0-9a-fA-F]+", "n"), // Hex integer.
   Rule(r"[0-9]+[Lu]?", "n"), // Integer.
 
   Rule(r"//.*", "c"), // Line comment.
-  Rule(r"/\*.*\*\/", "c"), // Line comment.
+  Rule(r"\/\*.*\*\/", "c"), // Block comment.
 
   // Capitalized type name.
   Rule(r"[A-Z][A-Za-z0-9_]*", "t"),

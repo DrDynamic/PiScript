@@ -3,9 +3,6 @@
     border-radius: 5px;
 }
 
-$warm-dark: hsl(40, 0%, 35%);
-$warm-light: hsl(40, 30%, 97%);
-
 body {
     background-color: #EFEFEF;
     font-family: 'Source Sans 3';
@@ -119,9 +116,6 @@ pre {
 }
 
 .codehilite {
-    pre {
-        color: mix($warm-light, $warm-dark, 20%);
-    }
 
     .k {
         color: hsl(200, 100%, 45%);
@@ -144,7 +138,7 @@ pre {
 
     // String escape.
     .c {
-        color: mix($warm-light, $warm-dark, 50%);
+        color: hsl(0, 0%, 53%);
     }
 
     // Comment.

@@ -11,7 +11,7 @@ abstract class Rule {
   factory Rule.capture(String pattern, List<String> tokenTypes) =>
       CaptureRule(pattern, tokenTypes);
 
-  Rule._(String pattern) : pattern = RegExp(pattern);
+  Rule._(String pattern) : pattern = RegExp(pattern, dotAll: true);
 
   bool apply(Highlighter highlighter) {
     if (!highlighter.scanner!.scan(pattern)) return false;
@@ -59,11 +59,18 @@ class CaptureRule extends Rule {
 class StringRule extends Rule {
   static final _escapePattern = RegExp(r"\\.");
 
-  StringRule() : super._('"');
+  String quote;
+
+  StringRule(this.quote) : super._(quote);
 
   void applyRule(Highlighter highlighter) {
     var scanner = highlighter.scanner;
     var start = scanner!.position - 1;
+
+    var endCode = $doubleQuote;
+    if (this.quote == "'") {
+      endCode = $singleQuote;
+    }
 
     while (!scanner.isDone) {
       if (scanner.scan(_escapePattern)) {
@@ -73,7 +80,7 @@ class StringRule extends Rule {
         }
         highlighter.writeToken("e");
         start = scanner.position;
-      } else if (scanner.scanChar($double_quote)) {
+      } else if (scanner.scanChar(endCode)) {
         highlighter.writeToken("s", scanner.substring(start, scanner.position));
         return;
       } else {
@@ -94,5 +101,45 @@ class IdentifierRule extends Rule {
     var identifier = highlighter.scanner!.lastMatch![0];
     var type = highlighter.language.words[identifier] ?? "i";
     highlighter.writeToken(type);
+  }
+}
+
+class BlockCommentRule extends Rule {
+  final RegExp commentStart;
+  final RegExp commentEnd;
+  final String tokenType;
+
+  BlockCommentRule(String commentStart, String commentEnd, this.tokenType)
+      : commentStart = RegExp(commentStart),
+        commentEnd = RegExp(commentEnd),
+        super._(commentStart);
+
+  void applyRule(Highlighter highlighter) {
+    var scanner = highlighter.scanner;
+    var start = scanner!.position - 2;
+
+    var depth = 0;
+
+    print("Start scanning block comment");
+
+    while (!scanner.isDone) {
+      if (scanner.scan(this.commentStart)) {
+        depth++;
+      } else if (scanner.scan(this.commentEnd)) {
+        if (depth > 0) {
+          depth--;
+        } else {
+          highlighter.writeToken(
+              "c", scanner.substring(start, scanner.position));
+          return;
+        }
+      } else {
+        scanner.position++;
+      }
+    }
+    print("End scanning block comment - no close");
+
+    // Error: Unterminated string.
+    highlighter.writeToken("err", scanner.substring(start, scanner.position));
   }
 }

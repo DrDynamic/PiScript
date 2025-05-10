@@ -15,7 +15,6 @@ class HighlightedCodeBlockSyntax extends BlockSyntax {
       pattern.firstMatch(parser.current.content) != null;
 
   List<Line?> parseChildLines(BlockParser parser) {
-    print("Parse Child Nodes!");
     var childLines = <Line?>[];
     parser.advance();
 
@@ -40,8 +39,6 @@ class HighlightedCodeBlockSyntax extends BlockSyntax {
     var language = match[2];
 
     var childLines = parseChildLines(parser);
-
-    print("Parse code_syntax: $language");
 
     String code;
     if (language == "text") {
@@ -68,9 +65,11 @@ class HighlightedCodeBlockSyntax extends BlockSyntax {
       buffer.write("</pre>");
       code = buffer.toString();
     } else {
-      code = formatCode(
-          language!, childLines.map((Line? line) => line!.content).toList(),
-          indent: indent);
+      code = formatCode(language!,
+          [childLines.map((Line? line) => line!.content).join("\n")]);
+//      code = formatCode(
+//          language!, childLines.map((Line? line) => line!.content).toList(),
+//          indent: indent);
     }
 
     var element = Element.text("div", code);
