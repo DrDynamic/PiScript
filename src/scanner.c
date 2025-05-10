@@ -177,7 +177,20 @@ static TokenType identifierType(Parser* parser)
     case 'p':
         return checkKeyword(parser, 1, 4, "rint", TOKEN_PRINT);
     case 'r':
-        return checkKeyword(parser, 1, 5, "eturn", TOKEN_RETURN);
+        if (parser->currentChar - parser->tokenStart > 1) {
+            switch (parser->tokenStart[1]) {
+            case 'e':
+                if (parser->currentChar - parser->tokenStart > 1) {
+                    switch (parser->tokenStart[2]) {
+                    case 't':
+                        return checkKeyword(parser, 3, 3, "urn", TOKEN_RETURN);
+                    case 'q':
+                        return checkKeyword(parser, 3, 4, "uire", TOKEN_REQUIRE);
+                    }
+                }
+            }
+        }
+        break;
     case 's':
         return checkKeyword(parser, 1, 4, "uper", TOKEN_SUPER);
     case 't':
