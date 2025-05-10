@@ -558,6 +558,15 @@ static void variable(bool canAssign)
     namedVariable(current->parser->previous, canAssign);
 }
 
+static void require(bool canAssign)
+{
+    (void)canAssign;
+    Parser parser;
+    Compiler compiler;
+
+    // TODO:
+}
+
 static Token syntheticToken(const char* text)
 {
     Token token;
@@ -663,6 +672,7 @@ ParseRule rules[] = {
     [TOKEN_OR] = { NULL, or_, PREC_OR },
     [TOKEN_PRINT] = { NULL, NULL, PREC_NONE },
     [TOKEN_RETURN] = { NULL, NULL, PREC_NONE },
+    [TOKEN_REQUIRE] = { require, NULL, PREC_NONE },
     [TOKEN_SUPER] = { super_, NULL, PREC_NONE },
     [TOKEN_THIS] = { this_, NULL, PREC_NONE },
     [TOKEN_TRUE] = { literal, NULL, PREC_NONE },

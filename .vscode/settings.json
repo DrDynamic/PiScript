@@ -18,6 +18,7 @@
         "debug.h": "c",
         "addresstable.h": "c",
         "object.h": "c",
-        "integerarray.h": "c"
+        "integerarray.h": "c",
+        "util.h": "c"
     }
 }

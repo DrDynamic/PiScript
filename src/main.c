@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "vm.h"
+#include "util/util.h"
 
 
 static void repl()
@@ -21,7 +22,7 @@ static void repl()
         interpret(line);
     }
 }
-
+/*
 static char* readFile(const char* path)
 {
     FILE* file = fopen(path, "rb");
@@ -46,17 +47,24 @@ static char* readFile(const char* path)
     fclose(file);
     return buffer;
 }
+*/
 
 static void runFile(const char* path)
 {
-    char* source = readFile(path);
-    InterpretResult result = interpret(source);
-    free(source);
-
-    if (result == INTERPRET_COMPILE_ERROR)
-        exit(65);
-    if (result == INTERPRET_RUNTIME_ERROR)
-        exit(70);
+    char* source = NULL;
+    char* error = readFile(path, &source);
+    if (error == NULL) {
+        InterpretResult result = interpret(source);
+        free(source);
+        if (result == INTERPRET_COMPILE_ERROR)
+            exit(65);
+        if (result == INTERPRET_RUNTIME_ERROR)
+            exit(70);
+    } else {
+        fprintf(stderr, error);
+        free(error);
+        exit(74);
+    }
 }
 
 int main(int argc, const char* argv[])
