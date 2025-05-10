@@ -61,7 +61,36 @@ typedef struct {
     int line;
 } Token;
 
-void initScanner(const char* source);
-Token scanToken();
+typedef struct sObjModule ObjModule;
+typedef struct sVM VM;
+
+
+typedef struct {
+    VM* vm;
+
+    // the current module
+    ObjModule* module;
+
+    // sourcecode of current module
+    const char* source;
+    // start of the current token in source
+    const char* tokenStart;
+    // the current character in source
+    const char* currentChar;
+    // the current line
+    int currentLine;
+
+    // the current token
+    Token current;
+    // the last token
+    Token previous;
+    // whether the lexer or compiler found an error in source
+    bool hadError;
+    // stop priniting errors to prevent error cascades
+    bool panicMode;
+} Parser;
+
+void initScanner(Parser* parser, const char* source);
+Token scanToken(Parser* parser);
 
 #endif

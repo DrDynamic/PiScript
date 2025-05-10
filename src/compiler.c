@@ -14,19 +14,6 @@
 #include "debug.h"
 #endif
 
-typedef struct {
-    VM* vm;
-
-    // the current module
-    ObjModule* module;
-
-    const char* source;
-
-    Token current;
-    Token previous;
-    bool hadError;
-    bool panicMode;
-} Parser;
 
 typedef enum {
     PREC_NONE,
@@ -148,7 +135,7 @@ static void advance()
     parser->previous = parser->current;
 
     for (;;) {
-        parser->current = scanToken();
+        parser->current = scanToken(parser);
         if (parser->current.type != TOKEN_ERROR) {
             break;
         }
@@ -1234,7 +1221,7 @@ void defineNative(const char* name, NativeFn function)
 ObjFunction* compile(const char* source)
 {
     Parser parser;
-    initScanner(source);
+    initScanner(&parser, source);
     Compiler compiler;
     initCompiler(&compiler, &parser, TYPE_SCRIPT);
 

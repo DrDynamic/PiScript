@@ -102,7 +102,7 @@ typedef struct {
     ValueArray valueArray;
 } ObjArray;
 
-typedef struct {
+typedef struct sObjModule {
     Obj obj;
 
     // AddressTable globals;

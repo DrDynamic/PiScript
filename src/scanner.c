@@ -4,19 +4,13 @@
 #include "common.h"
 #include "scanner.h"
 
-typedef struct {
-    const char* start;
-    const char* current;
-    int line;
-} Scanner;
 
-Scanner scanner;
-
-void initScanner(const char* source)
+void initScanner(Parser* parser, const char* source)
 {
-    scanner.start = source;
-    scanner.current = source;
-    scanner.line = 1;
+    parser->source = source;
+    parser->tokenStart = source;
+    parser->currentChar = source;
+    parser->currentLine = 1;
 
 #ifdef DEBUG_PRINT_TOKENS
     int line = -1;
@@ -34,9 +28,10 @@ void initScanner(const char* source)
             break;
     }
 
-    scanner.start = source;
-    scanner.current = source;
-    scanner.line = 1;
+    parser->source = source;
+    parser->tokenStart = source;
+    parser->currentChar = source;
+    parser->currentLine = 1;
 #endif
 }
 
@@ -50,79 +45,79 @@ static bool isDigit(char c)
     return c >= '0' && c <= '9';
 }
 
-static bool isAtEnd()
+static bool isAtEnd(Parser* parser)
 {
-    return *scanner.current == '\0';
+    return *parser->currentChar == '\0';
 }
 
-static char advance()
+static char advance(Parser* parser)
 {
-    scanner.current++;
-    return scanner.current[-1];
+    parser->currentChar++;
+    return parser->currentChar[-1];
 }
 
-static char peek()
+static char peek(Parser* parser)
 {
-    return *scanner.current;
+    return *parser->currentChar;
 }
 
-static char peekNext()
+static char peekNext(Parser* parser)
 {
-    if (isAtEnd())
+    if (isAtEnd(parser))
         return '\0';
-    return scanner.current[1];
+    return parser->currentChar[1];
 }
 
-static bool match(char expected)
+static bool match(Parser* parser, char expected)
 {
-    if (isAtEnd())
+    if (isAtEnd(parser))
         return false;
-    if (*scanner.current != expected)
+    if (*parser->currentChar != expected)
         return false;
-    scanner.current++;
+    parser->currentChar++;
     return true;
 }
 
 
-static Token makeToken(TokenType type)
+static Token makeToken(Parser* parser, TokenType type)
 {
     Token token;
     token.type = type;
-    token.start = scanner.start;
-    token.length = (int)(scanner.current - scanner.start);
-    token.line = scanner.line;
+    token.start = parser->tokenStart;
+    token.length = (int)(parser->currentChar - parser->tokenStart);
+    token.line = parser->currentLine;
     return token;
 }
 
-static Token errorToken(const char* message)
+static Token errorToken(Parser* parser, const char* message)
 {
     Token token;
     token.type = TOKEN_ERROR;
     token.start = message;
     token.length = (int)strlen(message);
-    token.line = scanner.line;
+    token.line = parser->currentLine;
     return token;
 }
 
-static void skipWhitespaces()
+static void skipWhitespaces(Parser* parser)
 {
     for (;;) {
-        char c = peek();
+        char c = peek(parser);
         switch (c) {
         case ' ':
         case '\r':
         case '\t':
-            advance();
+            advance(parser);
             break;
         case '\n':
-            scanner.line++;
-            advance();
+            parser->currentLine++;
+            advance(parser);
             break;
         case '/':
             // TODO: add multiline comments
-            if (peekNext() == '/') {
-                while (peek() != '\n' && !isAtEnd()) {
-                    advance();
+            if (peekNext(parser) == '/') {
+                while (peek(parser) != '\n' && !isAtEnd(parser)) {
+                    advance(parser);
                 }
             } else {
                 return;
@@ -134,167 +129,168 @@ static void skipWhitespaces()
     }
 }
 
-static TokenType checkKeyword(int start, int length, const char* rest, TokenType type)
+static TokenType checkKeyword(
+    Parser* parser, int start, int length, const char* rest, TokenType type)
 {
-    if (scanner.current - scanner.start == start + length
-        && memcmp(scanner.start + start, rest, length) == 0) {
+    if (parser->currentChar - parser->tokenStart == start + length
+        && memcmp(parser->tokenStart + start, rest, length) == 0) {
         return type;
     }
     return TOKEN_IDENTIFIER;
 }
 
-static TokenType identifierType()
+static TokenType identifierType(Parser* parser)
 {
-    switch (scanner.start[0]) {
+    switch (parser->tokenStart[0]) {
     case 'a':
-        return checkKeyword(1, 2, "nd", TOKEN_AND);
+        return checkKeyword(parser, 1, 2, "nd", TOKEN_AND);
     case 'c':
-        if (scanner.current - scanner.start > 1) {
-            switch (scanner.start[1]) {
+        if (parser->currentChar - parser->tokenStart > 1) {
+            switch (parser->tokenStart[1]) {
             case 'l':
-                return checkKeyword(2, 3, "ass", TOKEN_CLASS);
+                return checkKeyword(parser, 2, 3, "ass", TOKEN_CLASS);
             case 'o':
-                return checkKeyword(2, 3, "nst", TOKEN_CONST);
+                return checkKeyword(parser, 2, 3, "nst", TOKEN_CONST);
             }
         }
         break;
     case 'e':
-        return checkKeyword(1, 3, "lse", TOKEN_ELSE);
+        return checkKeyword(parser, 1, 3, "lse", TOKEN_ELSE);
     case 'f':
-        if (scanner.current - scanner.start > 1) {
-            switch (scanner.start[1]) {
+        if (parser->currentChar - parser->tokenStart > 1) {
+            switch (parser->tokenStart[1]) {
             case 'a':
-                return checkKeyword(2, 3, "lse", TOKEN_FALSE);
+                return checkKeyword(parser, 2, 3, "lse", TOKEN_FALSE);
             case 'o':
-                return checkKeyword(2, 1, "r", TOKEN_FOR);
+                return checkKeyword(parser, 2, 1, "r", TOKEN_FOR);
             case 'u':
-                return checkKeyword(2, 1, "n", TOKEN_FUN);
+                return checkKeyword(parser, 2, 1, "n", TOKEN_FUN);
             }
         }
         break;
     case 'i':
-        return checkKeyword(1, 1, "f", TOKEN_IF);
+        return checkKeyword(parser, 1, 1, "f", TOKEN_IF);
     case 'n':
-        return checkKeyword(1, 2, "il", TOKEN_NIL);
+        return checkKeyword(parser, 1, 2, "il", TOKEN_NIL);
     case 'o':
-        return checkKeyword(1, 1, "r", TOKEN_OR);
+        return checkKeyword(parser, 1, 1, "r", TOKEN_OR);
     case 'p':
-        return checkKeyword(1, 4, "rint", TOKEN_PRINT);
+        return checkKeyword(parser, 1, 4, "rint", TOKEN_PRINT);
     case 'r':
-        return checkKeyword(1, 5, "eturn", TOKEN_RETURN);
+        return checkKeyword(parser, 1, 5, "eturn", TOKEN_RETURN);
     case 's':
-        return checkKeyword(1, 4, "uper", TOKEN_SUPER);
+        return checkKeyword(parser, 1, 4, "uper", TOKEN_SUPER);
     case 't':
-        if (scanner.current - scanner.start > 1) {
-            switch (scanner.start[1]) {
+        if (parser->currentChar - parser->tokenStart > 1) {
+            switch (parser->tokenStart[1]) {
             case 'h':
-                return checkKeyword(2, 2, "is", TOKEN_THIS);
+                return checkKeyword(parser, 2, 2, "is", TOKEN_THIS);
             case 'r':
-                return checkKeyword(2, 2, "ue", TOKEN_TRUE);
+                return checkKeyword(parser, 2, 2, "ue", TOKEN_TRUE);
             }
         }
         break;
     case 'v':
-        return checkKeyword(1, 2, "ar", TOKEN_VAR);
+        return checkKeyword(parser, 1, 2, "ar", TOKEN_VAR);
     case 'w':
-        return checkKeyword(1, 4, "hile", TOKEN_WHILE);
+        return checkKeyword(parser, 1, 4, "hile", TOKEN_WHILE);
     }
     return TOKEN_IDENTIFIER;
 }
 
-static Token identifier()
+static Token identifier(Parser* parser)
 {
-    while (isAlpha(peek()) || isDigit(peek())) {
-        advance();
+    while (isAlpha(peek(parser)) || isDigit(peek(parser))) {
+        advance(parser);
     }
-    return makeToken(identifierType());
+    return makeToken(parser, identifierType(parser));
 }
 
-static Token number()
+static Token number(Parser* parser)
 {
-    while (isDigit(peek())) {
-        advance();
+    while (isDigit(peek(parser))) {
+        advance(parser);
     }
-    if (peek() == '.' && isDigit(peekNext())) {
+    if (peek(parser) == '.' && isDigit(peekNext(parser))) {
         // Consume the '.'
-        advance();
-        while (isDigit(peek())) {
-            advance();
+        advance(parser);
+        while (isDigit(peek(parser))) {
+            advance(parser);
         }
     }
-    return makeToken(TOKEN_NUMBER);
+    return makeToken(parser, TOKEN_NUMBER);
 }
 
-static Token string()
+static Token string(Parser* parser)
 {
-    while (peek() != '"' && !isAtEnd()) {
-        if (peek() == '\n') {
-            scanner.line++;
+    while (peek(parser) != '"' && !isAtEnd(parser)) {
+        if (peek(parser) == '\n') {
+            parser->currentLine++;
         }
-        advance();
+        advance(parser);
     }
 
-    if (isAtEnd()) {
-        return errorToken("Unterminated string.");
+    if (isAtEnd(parser)) {
+        return errorToken(parser, "Unterminated string.");
     }
     // consume the closing quote
-    advance();
-    return makeToken(TOKEN_STRING);
+    advance(parser);
+    return makeToken(parser, TOKEN_STRING);
 }
 
-Token scanToken()
+Token scanToken(Parser* parser)
 {
-    skipWhitespaces();
-    scanner.start = scanner.current;
-    if (isAtEnd())
-        return makeToken(TOKEN_EOF);
+    skipWhitespaces(parser);
+    parser->tokenStart = parser->currentChar;
+    if (isAtEnd(parser))
+        return makeToken(parser, TOKEN_EOF);
 
-    char c = advance();
+    char c = advance(parser);
 
     if (isAlpha(c))
-        return identifier();
+        return identifier(parser);
 
     // allow other number formats 0xFF / .99 / o777 / etc.
     if (isDigit(c))
-        return number();
+        return number(parser);
     switch (c) {
     case '(':
-        return makeToken(TOKEN_LEFT_PAREN);
+        return makeToken(parser, TOKEN_LEFT_PAREN);
     case ')':
-        return makeToken(TOKEN_RIGHT_PAREN);
+        return makeToken(parser, TOKEN_RIGHT_PAREN);
     case '{':
-        return makeToken(TOKEN_LEFT_BRACE);
+        return makeToken(parser, TOKEN_LEFT_BRACE);
     case '}':
-        return makeToken(TOKEN_RIGHT_BRACE);
+        return makeToken(parser, TOKEN_RIGHT_BRACE);
     case '[':
-        return makeToken(TOKEN_LEFT_BRACKET);
+        return makeToken(parser, TOKEN_LEFT_BRACKET);
     case ']':
-        return makeToken(TOKEN_RIGHT_BRACKET);
+        return makeToken(parser, TOKEN_RIGHT_BRACKET);
     case ';':
-        return makeToken(TOKEN_SEMICOLON);
+        return makeToken(parser, TOKEN_SEMICOLON);
     case ',':
-        return makeToken(TOKEN_COMMA);
+        return makeToken(parser, TOKEN_COMMA);
     case '.':
-        return makeToken(TOKEN_DOT);
+        return makeToken(parser, TOKEN_DOT);
     case '-':
-        return makeToken(TOKEN_MINUS);
+        return makeToken(parser, TOKEN_MINUS);
     case '+':
-        return makeToken(TOKEN_PLUS);
+        return makeToken(parser, TOKEN_PLUS);
     case '/':
-        return makeToken(TOKEN_SLASH);
+        return makeToken(parser, TOKEN_SLASH);
     case '*':
-        return makeToken(TOKEN_STAR);
+        return makeToken(parser, TOKEN_STAR);
     case '!':
-        return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
+        return makeToken(parser, match(parser, '=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=':
-        return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+        return makeToken(parser, match(parser, '=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
     case '<':
-        return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
+        return makeToken(parser, match(parser, '=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
     case '>':
-        return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+        return makeToken(parser, match(parser, '=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
     case '"': // TODO: support single quote strings / template strings
-        return string();
+        return string(parser);
     }
 
-    return errorToken("Unexpected character.");
+    return errorToken(parser, "Unexpected character.");
 }
