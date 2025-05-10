@@ -72,7 +72,6 @@ typedef struct ObjUpvalue {
     struct ObjUpvalue* next;
 } ObjUpvalue;
 
-
 typedef struct {
     Obj obj;
     ObjFunction* function;
@@ -102,6 +101,14 @@ typedef struct {
     Obj obj;
     ValueArray valueArray;
 } ObjArray;
+
+typedef struct {
+    Obj obj;
+
+    // AddressTable globals;
+
+    ObjString* name;
+} ObjModule;
 
 ObjArray* newArray();
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);

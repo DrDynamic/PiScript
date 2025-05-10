@@ -23,5 +23,5 @@
 #endif
 
 #define UINT8_COUNT (UINT8_MAX + 1)
-
+#define MAX_UPVALUES 256
 #endif

@@ -1,5 +1,12 @@
-var a = [];
-print []; // expect: []
+fun isEven(n) {
+  if (n == 0) return true;
+  return isOdd(n - 1);
+}
 
-var b  = ["lorem", 1, true, nil];
-print b; // expect: [lorem, 1, true, nil]
+fun isOdd(n) {
+  if (n == 0) return false;
+  return isEven(n - 1);
+}
+
+print isEven(4); // expect: true
+print isOdd(3); // expect: true
