@@ -1,5 +1,9 @@
-var a = [];
-print []; // expect: []
+{
+    class array {
 
-var b  = ["lorem", 1, true, nil];
-print b; // expect: [lorem, 1, true, nil]
+    }
+}
+
+
+var a = [];
+print(a.count());

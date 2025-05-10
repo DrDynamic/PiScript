@@ -321,6 +321,15 @@ static void endScope()
     }
 }
 
+static ObjString* getVarName(uint32_t addr)
+{
+    if (current->scopeDepth > 0) {
+        return addresstableGetName(&current->locals, addr);
+    } else {
+        return addresstableGetName(&vm.gloablsTable, addr);
+    }
+}
+
 static int resolveUpvalue(Compiler* compiler, Token* name, Var** varProps);
 static void expression();
 static void statement();
@@ -492,6 +501,9 @@ static void array(bool canAssign)
     emitBytes(OP_ARRAY_INIT, argCount);
 }
 
+/// @brief Load or assign to a variable
+/// @param name The identifier of the variable
+/// @param canAssign true when Assignment is allowed
 static void namedVariable(Token name, bool canAssign)
 {
     OpCode getOp, getOpLong, setOp, setOpLong;
@@ -532,6 +544,8 @@ static void namedVariable(Token name, bool canAssign)
     }
 }
 
+/// @brief Load or assign to the variable parser.previous
+/// @param canAssign true when Assignment is allowed
 static void variable(bool canAssign)
 {
     namedVariable(parser.previous, canAssign);
@@ -927,9 +941,38 @@ static void method()
 static void classDeclaration()
 {
     uint32_t varAddr = parseVariable("Expect class name.");
+    ObjString* className = getVarName(varAddr);
+    ObjClass* class = newClass(className);
+
+    ClassCompiler classCompiler;
+    classCompiler.hasSuperclass = false;
+    classCompiler.enclosing = currentClass;
+    currentClass = &classCompiler;
+
+    if (match(TOKEN_LESS)) { // TODO: use extends keyword
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        variable(false);
+
+        if (identifiersEqual(&className->chars, &parser.previous)) {
+            error("A class can't inherit from itself.");
+        }
+
+        beginScope();
+        addLocal(syntheticToken("super"));
+        defineVariable(0, true);
+
+        namedVariable(className->chars, false);
+        emitByte(OP_INHERIT);
+        classCompiler.hasSuperclass = true;
+    }
+
+
+    return;
+    /*
+    uint32_t varAddr = parseVariable("Expect class name.");
     Token className = parser.previous;
-    // TODO: remove name from class declaration?
     uint32_t nameAddr = identifierConstant(&parser.previous);
+
     emitConstant(nameAddr, parser.previous.line, OP_CLASS, OP_CLASS_LONG);
     defineVariable(varAddr, true);
 
@@ -969,6 +1012,7 @@ static void classDeclaration()
     }
 
     currentClass = currentClass->enclosing;
+    */
 }
 
 static void funDeclaration()
