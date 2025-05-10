@@ -1,9 +1,9 @@
 #include <time.h>
 
 #include "natives.h"
-#include "values/value.h"
-#include "compiler.h"
-#include "util/memory.h"
+#include "value.h"
+#include "../compiler.h"
+#include "../util/memory.h"
 
 static Value clockNative(int argCount, Value* args)
 {

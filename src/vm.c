@@ -8,7 +8,7 @@
 #include "util/debug.h"
 // #include "object.h"
 #include "util/memory.h"
-#include "natives.h"
+#include "values/natives.h"
 
 VM vm;
 
