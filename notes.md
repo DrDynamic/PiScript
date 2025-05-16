@@ -3,6 +3,68 @@
 https://github.com/Dinesh21Kumar/gtest-example/blob/master/CMakeLists.txt
 
 
+# Require
+How should require behave?
+
+this should be a constant or a singleton like object?
+```wip
+return {
+  'a': 'b'
+}
+```
+
+What about Class singletons?
+```wip
+Class Something {
+  static var instance;
+  
+  public static function singleton() {
+    if(self::instance == null){
+      self::instance = Something.new();
+    }
+    return self::singleton;
+  }
+}
+return Something
+```
+
+Or functions?
+```wip
+
+var counter = 0;
+function increment() {
+  return counter++;
+}
+
+return closure;
+```
+
+Or This one?
+```wip 
+
+var counter = 0;
+
+function increment(){
+  return counter++;
+}
+
+function decrement(){
+  return counter--;
+}
+
+function value(){
+  return counter;
+}
+
+return {
+  increment,
+  decrement,
+  value
+};
+
+```
+
+
 # TODOS
 - define syntax
 - define features
