@@ -16,7 +16,6 @@ typedef struct {
     Value* slots;
 } CallFrame;
 
-
 typedef struct sVM {
     CallFrame frames[FRAMES_MAX];
     int frameCount;
@@ -57,6 +56,7 @@ extern VM vm;
 
 void initVM();
 void freeVM();
+InterpretResult interpretFile(const char* path, const char* source);
 InterpretResult interpret(const char* source);
 void push(Value value);
 Value pop();

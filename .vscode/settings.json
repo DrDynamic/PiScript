@@ -19,6 +19,7 @@
         "addresstable.h": "c",
         "object.h": "c",
         "integerarray.h": "c",
-        "util.h": "c"
+        "util.h": "c",
+        "table.h": "c"
     }
 }

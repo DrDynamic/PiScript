@@ -35,6 +35,7 @@ typedef enum {
     OBJ_NATIVE,
     OBJ_STRING,
     OBJ_UPVALUE,
+    OBJ_MODULE,
 } ObjType;
 
 struct Obj {
@@ -102,13 +103,16 @@ typedef struct {
     ValueArray valueArray;
 } ObjArray;
 
+typedef struct sCompiler Compiler;
 typedef struct sObjModule {
     Obj obj;
 
     // AddressTable globals;
 
-    ObjString* name;
+    ObjString* fqn;
+    Compiler* currentCompiler;
 } ObjModule;
+ObjModule* newModule(ObjString* fqn);
 
 ObjArray* newArray();
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);

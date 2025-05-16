@@ -24,4 +24,6 @@
 
 #define UINT8_COUNT (UINT8_MAX + 1)
 #define MAX_UPVALUES 256
+#define MAX_COMPILER_TEMPS 64
+
 #endif

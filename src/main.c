@@ -54,7 +54,7 @@ static void runFile(const char* path)
     char* source = NULL;
     char* error = readFile(path, &source);
     if (error == NULL) {
-        InterpretResult result = interpret(source);
+        InterpretResult result = interpretFile(path, source);
         free(source);
         if (result == INTERPRET_COMPILE_ERROR)
             exit(65);

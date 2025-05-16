@@ -63,6 +63,14 @@ static uint32_t hashString(const char* key, int length)
     return hash;
 }
 
+ObjModule* newModule(ObjString* fqn)
+{
+    ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
+    module->fqn = fqn;
+    module->currentCompiler = NULL;
+    return module;
+}
+
 ObjArray* newArray()
 {
     ObjArray* array = ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);

@@ -6,4 +6,7 @@
 
 void defineNative(const char* name, NativeFn function);
 ObjFunction* compile(const char* source);
-void markCompilerRoots();
+ObjFunction* compileModule(ObjString* fqn, const char* source, ObjModule* caller);
+
+void markModules();
+void markCompilerRoots(Compiler* compiler);

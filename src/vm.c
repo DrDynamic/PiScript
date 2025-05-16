@@ -801,8 +801,29 @@ static InterpretResult run()
 #undef BINARY_OP
 }
 
+InterpretResult interpretFile(const char* path, const char* source)
+{
+    ObjString* fqn = copyString(path, strlen(path));
+    push(OBJ_VAL(fqn));
+    ObjFunction* function = compileModule(fqn, source, NULL);
+    pop();
+
+    if (function == NULL) {
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    push(OBJ_VAL(function));
+    ObjClosure* closure = newClosure(function);
+    pop();
+    push(OBJ_VAL(closure));
+    call(closure, 0);
+
+    return run();
+}
+
 InterpretResult interpret(const char* source)
 {
+
     ObjFunction* function = compile(source);
     if (function == NULL) {
         return INTERPRET_COMPILE_ERROR;

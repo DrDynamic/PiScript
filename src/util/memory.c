@@ -46,6 +46,10 @@ static void freeObject(Obj* object)
     printf("'\n");
 #endif
     switch (object->type) {
+    case OBJ_MODULE: {
+        FREE(ObjModule, object);
+        break;
+    }
     case OBJ_ARRAY: {
         ObjArray* array = (ObjArray*)object;
         freeValueArray(&array->valueArray);
@@ -153,6 +157,12 @@ static void blackenObject(Obj* object)
     printf("\n");
 #endif
     switch (object->type) {
+    case OBJ_MODULE: {
+        ObjModule* module = (ObjModule*)object;
+        markObject((Obj*)module->fqn);
+        markCompilerRoots(module->currentCompiler);
+        break;
+    }
     case OBJ_ARRAY: {
         ObjArray* array = (ObjArray*)object;
         markValueArray(&array->valueArray);
@@ -225,7 +235,8 @@ static void markRoots()
     markTable(&vm.gloablsTable.addresses);
     // markVarArray(&vm.globalProps);
 
-    markCompilerRoots();
+    markModules();
+
     markObject((Obj*)vm.initString);
 }
 
