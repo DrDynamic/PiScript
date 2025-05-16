@@ -23,7 +23,7 @@ var _failed = 0;
 var _skipped = 0;
 var _expectations = 0;
 
-Suite? _suite ;
+Suite? _suite;
 String? _filterPath;
 String? _customInterpreter;
 List<String>? _customArguments;
@@ -43,8 +43,6 @@ class Suite {
 }
 
 void main(List<String> arguments) {
-  _defineTestSuites();
-
   var parser = ArgParser();
 
   parser.addOption("interpreter", abbr: "i", help: "Path to interpreter.");
@@ -52,15 +50,6 @@ void main(List<String> arguments) {
       abbr: "a", help: "Additional interpreter arguments.");
 
   var options = parser.parse(arguments);
-  String? suite;
-  if (options.rest.isEmpty) {
-    suite = "none";
-  } else if (options.rest.length > 2) {
-    _usageError(
-        parser, "Unexpected arguments '${options.rest.skip(2).join(' ')}'.");
-  }else {
-    var suite = options.rest[0];
-  }
 
   if (options.rest.length == 2) _filterPath = arguments[1];
 
@@ -77,13 +66,7 @@ void main(List<String> arguments) {
     }
   }
 
-  if (suite == "all") {
-    _runSuites(_allSuites.keys.toList());
-  } else if (suite == "c") {
-    _runSuites(_cSuites);
-  } else if (!_runTests()) {
-    exit(1);
-  }
+  _runTests();
 }
 
 void _usageError(ArgParser parser, String message) {
@@ -96,54 +79,19 @@ void _usageError(ArgParser parser, String message) {
   exit(1);
 }
 
-void _runSuites(List<String> names) {
-  var anyFailed = false;
-  for (var name in names) {
-    print("=== $name ===");
-    if (!_runSuite(name)) anyFailed = true;
-  }
-
-  if (anyFailed) exit(1);
-}
-
-bool _runSuite(String name) {
-  _suite = _allSuites[name];
-
-  _passed = 0;
-  _failed = 0;
-  _skipped = 0;
-  _expectations = 0;
-
-  for (var file in Glob("language-tests/**.lox").listSync()) {
-    _runTest(file.path);
-  }
-
-  term.clearLine();
-
-  if (_failed == 0) {
-    print("All ${term.green(_passed)} tests passed "
-        "($_expectations expectations).");
-  } else {
-    print("${term.green(_passed)} tests passed. "
-        "${term.red(_failed)} tests failed.");
-  }
-
-  return _failed == 0;
-}
-
 bool _runTests() {
   _passed = 0;
   _failed = 0;
   _skipped = 0;
   _expectations = 0;
 
-  for (var file in Glob("language-tests/**.lox").listSync()) {
+  for (var file in Glob("language-tests/**.tox").listSync()) {
     _runTest(file.path);
   }
 
   term.clearLine();
 
-   if (_failed == 0) {
+  if (_failed == 0) {
     print("All ${term.green(_passed)} tests passed "
         "($_expectations expectations).");
   } else {
@@ -317,7 +265,8 @@ class Test {
       if (_customInterpreter != null) ...?_customArguments else ..._suite!.args,
       _path
     ];
-    var result = Process.runSync(_customInterpreter ?? _suite!.executable, args);
+    var result =
+        Process.runSync(_customInterpreter ?? _suite!.executable, args);
 
     // Normalize Windows line endings.
     var outputLines = const LineSplitter().convert(result.stdout as String);
@@ -446,222 +395,4 @@ class Test {
     _failures.add(message);
     if (lines != null) _failures.addAll(lines);
   }
-}
-
-void _defineTestSuites() {
-  void c(String name, Map<String, String> tests) {
-    var executable = name == "clox" ? "build/cloxd" : "build/$name";
-
-    _allSuites[name] = Suite(name, "c", executable, [], tests);
-    _cSuites.add(name);
-  }
-
-  // These are just for earlier chapters.
-  var earlyChapters = {
-    "language-tests/scanning": "skip",
-    "language-tests/expressions": "skip",
-  };
-
-  // No control flow in C yet.
-  var noCControlFlow = {
-    "language-tests/block/empty.lox": "skip",
-    "language-tests/for": "skip",
-    "language-tests/if": "skip",
-    "language-tests/limit/loop_too_large.lox": "skip",
-    "language-tests/logical_operator": "skip",
-    "language-tests/variable/unreached_undefined.lox": "skip",
-    "language-tests/while": "skip",
-  };
-
-  // No functions in C yet.
-  var noCFunctions = {
-    "language-tests/call": "skip",
-    "language-tests/closure": "skip",
-    "language-tests/for/closure_in_body.lox": "skip",
-    "language-tests/for/return_closure.lox": "skip",
-    "language-tests/for/return_inside.lox": "skip",
-    "language-tests/for/syntax.lox": "skip",
-    "language-tests/function": "skip",
-    "language-tests/limit/no_reuse_constants.lox": "skip",
-    "language-tests/limit/stack_overflow.lox": "skip",
-    "language-tests/limit/too_many_constants.lox": "skip",
-    "language-tests/limit/too_many_locals.lox": "skip",
-    "language-tests/limit/too_many_upvalues.lox": "skip",
-    "language-tests/regression/40.lox": "skip",
-    "language-tests/return": "skip",
-    "language-tests/unexpected_character.lox": "skip",
-    "language-tests/variable/collide_with_parameter.lox": "skip",
-    "language-tests/variable/duplicate_parameter.lox": "skip",
-    "language-tests/variable/early_bound.lox": "skip",
-    "language-tests/while/closure_in_body.lox": "skip",
-    "language-tests/while/return_closure.lox": "skip",
-    "language-tests/while/return_inside.lox": "skip",
-  };
-
-  // No classes in C yet.
-  var noCClasses = {
-    "language-tests/assignment/to_this.lox": "skip",
-    "language-tests/call/object.lox": "skip",
-    "language-tests/class": "skip",
-    "language-tests/closure/close_over_method_parameter.lox": "skip",
-    "language-tests/constructor": "skip",
-    "language-tests/field": "skip",
-    "language-tests/inheritance": "skip",
-    "language-tests/method": "skip",
-    "language-tests/number/decimal_point_at_eof.lox": "skip",
-    "language-tests/number/trailing_dot.lox": "skip",
-    "language-tests/operator/equals_class.lox": "skip",
-    "language-tests/operator/equals_method.lox": "skip",
-    "language-tests/operator/not.lox": "skip",
-    "language-tests/operator/not_class.lox": "skip",
-    "language-tests/regression/394.lox": "skip",
-    "language-tests/return/in_method.lox": "skip",
-    "language-tests/super": "skip",
-    "language-tests/this": "skip",
-    "language-tests/variable/local_from_method.lox": "skip",
-  };
-
-  // No inheritance in C yet.
-  var noCInheritance = {
-    "language-tests/class/local_inherit_other.lox": "skip",
-    "language-tests/class/local_inherit_self.lox": "skip",
-    "language-tests/class/inherit_self.lox": "skip",
-    "language-tests/class/inherited_method.lox": "skip",
-    "language-tests/inheritance": "skip",
-    "language-tests/regression/394.lox": "skip",
-    "language-tests/super": "skip",
-  };
-
-  c("clox", {
-    "language-tests": "pass",
-    ...earlyChapters,
-  });
-
-  c("chap17_compiling", {
-    // No real interpreter yet.
-    "language-tests": "skip",
-    "language-tests/expressions/evaluate.lox": "pass",
-  });
-
-  c("chap18_types", {
-    // No real interpreter yet.
-    "language-tests": "skip",
-    "language-tests/expressions/evaluate.lox": "pass",
-  });
-
-  c("chap19_strings", {
-    // No real interpreter yet.
-    "language-tests": "skip",
-    "language-tests/expressions/evaluate.lox": "pass",
-  });
-
-  c("chap20_hash", {
-    // No real interpreter yet.
-    "language-tests": "skip",
-    "language-tests/expressions/evaluate.lox": "pass",
-  });
-
-  c("chap21_global", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCControlFlow,
-    ...noCFunctions,
-    ...noCClasses,
-
-    // No blocks.
-    "language-tests/assignment/local.lox": "skip",
-    "language-tests/variable/in_middle_of_block.lox": "skip",
-    "language-tests/variable/in_nested_block.lox": "skip",
-    "language-tests/variable/scope_reuse_in_different_blocks.lox": "skip",
-    "language-tests/variable/shadow_and_local.lox": "skip",
-    "language-tests/variable/undefined_local.lox": "skip",
-
-    // No local variables.
-    "language-tests/block/scope.lox": "skip",
-    "language-tests/variable/duplicate_local.lox": "skip",
-    "language-tests/variable/shadow_global.lox": "skip",
-    "language-tests/variable/shadow_local.lox": "skip",
-    "language-tests/variable/use_local_in_initializer.lox": "skip",
-  });
-
-  c("chap22_local", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCControlFlow,
-    ...noCFunctions,
-    ...noCClasses,
-  });
-
-  c("chap23_jumping", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCFunctions,
-    ...noCClasses,
-  });
-
-  c("chap24_calls", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCClasses,
-
-    // No closures.
-    "language-tests/closure": "skip",
-    "language-tests/for/closure_in_body.lox": "skip",
-    "language-tests/for/return_closure.lox": "skip",
-    "language-tests/function/local_recursion.lox": "skip",
-    "language-tests/limit/too_many_upvalues.lox": "skip",
-    "language-tests/regression/40.lox": "skip",
-    "language-tests/while/closure_in_body.lox": "skip",
-    "language-tests/while/return_closure.lox": "skip",
-  });
-
-  c("chap25_closures", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCClasses,
-  });
-
-  c("chap26_garbage", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCClasses,
-  });
-
-  c("chap27_classes", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCInheritance,
-
-    // No methods.
-    "language-tests/assignment/to_this.lox": "skip",
-    "language-tests/class/local_reference_self.lox": "skip",
-    "language-tests/class/reference_self.lox": "skip",
-    "language-tests/closure/close_over_method_parameter.lox": "skip",
-    "language-tests/constructor": "skip",
-    "language-tests/field/get_and_set_method.lox": "skip",
-    "language-tests/field/method.lox": "skip",
-    "language-tests/field/method_binds_this.lox": "skip",
-    "language-tests/method": "skip",
-    "language-tests/operator/equals_class.lox": "skip",
-    "language-tests/operator/equals_method.lox": "skip",
-    "language-tests/return/in_method.lox": "skip",
-    "language-tests/this": "skip",
-    "language-tests/variable/local_from_method.lox": "skip",
-  });
-
-  c("chap28_methods", {
-    "language-tests": "pass",
-    ...earlyChapters,
-    ...noCInheritance,
-  });
-
-  c("chap29_superclasses", {
-    "language-tests": "pass",
-    ...earlyChapters,
-  });
-
-  c("chap30_optimization", {
-    "language-tests": "pass",
-    ...earlyChapters,
-  });
 }
