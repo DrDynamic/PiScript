@@ -1,0 +1,10 @@
+const s = require("./singleton");
+
+
+fun mutateSingleton() {
+    s[0] = "d";
+    s[1] = "e";
+    s[2] = "f";
+}
+
+return mutateSingleton;

@@ -1,0 +1,14 @@
+const bool = require("/types/bool");
+print bool; // exprect: true
+
+const cls = require("/types/class");
+print cls; // expect: <class Coffee>
+
+const instance = require("/types/instance");
+print instance; // expect: <object Coffee>
+
+const number = require("/type/number");
+print number; // expect: 13.37;
+
+const str = require("/types/string");
+print str; // expect: "i am a string"

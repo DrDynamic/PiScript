@@ -1,0 +1,6 @@
+const singleton = require("/singleton/singleton");
+const mutator = require("/singleton/mutator");
+
+print singleton; // exprect: ["a", "b", "c"]
+mutator.mutateSingleton();
+print singleton; // exprect: ["d", "e", "f"]
